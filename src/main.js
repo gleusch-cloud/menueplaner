@@ -380,7 +380,13 @@ async function syncRegistrieren(email, passwort) {
   const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
     method: 'POST',
     headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
-    body: JSON.stringify({ email, password: passwort })
+    body: JSON.stringify({
+      email,
+      password: passwort,
+      options: {
+        email_redirect_to: 'https://gleusch-cloud.github.io/menueplaner/'
+      }
+    })
   })
   const daten = await response.json()
   if (!response.ok) throw new Error(daten?.msg || daten?.error_description || 'Registrierung fehlgeschlagen.')
