@@ -58,7 +58,9 @@ const STORAGE = {
 
   wochenStart: 'menueplaner_wochenstart',
 
-  einkaufslisten: 'menueplaner_einkaufslisten'
+  einkaufslisten: 'menueplaner_einkaufslisten',
+
+  einkaufsHistorie: 'menueplaner_einkaufshistorie'
 
 }
 
@@ -157,6 +159,8 @@ let einkaufslisten = ladeDaten(
   {}
 )
 
+let einkaufsHistorie = ladeDaten(STORAGE.einkaufsHistorie, {})
+
 let aktuelleAnsicht = 'woche'
 
 let bearbeitetesGerichtId = null
@@ -241,6 +245,11 @@ function speichern() {
 
     JSON.stringify(einkaufslisten)
 
+  )
+
+  localStorage.setItem(
+    STORAGE.einkaufsHistorie,
+    JSON.stringify(einkaufsHistorie)
   )
 
   localStorage.setItem(
@@ -570,6 +579,30 @@ function aktuelleEinkaufsliste() {
   return findeEinkaufsliste()?.eintraege || []
 }
 
+function merkeEinkaufsArtikel(text) {
+  const sauber = String(text || '').trim()
+  if (!sauber) return
+
+  const key = sauber.toLocaleLowerCase('de-DE')
+  const alt = einkaufsHistorie[key] || { text: sauber, anzahl: 0, zuletzt: null }
+  einkaufsHistorie[key] = {
+    text: sauber,
+    anzahl: Number(alt.anzahl || 0) + 1,
+    zuletzt: new Date().toISOString()
+  }
+}
+
+function einkaufsVorschlaege() {
+  return Object.values(einkaufsHistorie)
+    .filter(item => item?.text)
+    .sort((a, b) =>
+      Number(b.anzahl || 0) - Number(a.anzahl || 0) ||
+      String(b.zuletzt || '').localeCompare(String(a.zuletzt || '')) ||
+      a.text.localeCompare(b.text, 'de')
+    )
+    .slice(0, 80)
+}
+
 function einkaufsEintragHinzufuegen(text, quelle = 'manuell', listenId = offeneEinkaufslisteId) {
   const sauber = String(text || '').trim()
   if (!sauber) return false
@@ -583,6 +616,7 @@ function einkaufsEintragHinzufuegen(text, quelle = 'manuell', listenId = offeneE
   )
 
   if (vorhanden) {
+    if (quelle === 'manuell') merkeEinkaufsArtikel(sauber)
     if (quelle !== 'manuell' && !vorhanden.quellen.includes(quelle)) {
       vorhanden.quellen.push(quelle)
       vorhanden.quelle = 'gericht'
@@ -590,6 +624,8 @@ function einkaufsEintragHinzufuegen(text, quelle = 'manuell', listenId = offeneE
     }
     return false
   }
+
+  if (quelle === 'manuell') merkeEinkaufsArtikel(sauber)
 
   liste.eintraege.push({
     id: neueId(),
@@ -1709,7 +1745,7 @@ function renderWochenansicht() {
 
       <div>
         <h2>
-          ${istAktuelleWoche() ? 'Diese Woche' : 'Wochenplan'}
+          Wochenplan
         </h2>
 
         <p>
@@ -1755,6 +1791,25 @@ function renderWochenansicht() {
     </section>
 
 
+
+    <section class="druckansicht druck-wochenplan">
+      <h1>Wochenplan</h1>
+      <p class="druck-zeitraum">${formatiereWochenZeitraum()}</p>
+      <div class="druck-tabelle">
+        ${wochenplan.map((eintrag, index) => {
+          const gericht = findeGericht(eintrag.gerichtId)
+          const snackNamen = eintrag.snackIds.map(id => findeSnack(id)?.name).filter(Boolean)
+          return `
+            <div class="druck-zeile">
+              <strong>${escapeHtml(eintrag.tag)}, ${formatiereTagesDatum(datumFuerTag(index))}</strong>
+              <span>${gericht ? escapeHtml(gericht.name) : '–'}</span>
+              <span>${snackNamen.length ? 'Snacks: ' + snackNamen.map(escapeHtml).join(', ') : ''}</span>
+              <span>${eintrag.notiz ? 'Notiz: ' + escapeHtml(eintrag.notiz) : ''}</span>
+            </div>
+          `
+        }).join('')}
+      </div>
+    </section>
 
     <section class="tage-liste">
 
@@ -1861,7 +1916,7 @@ function renderWochenansicht() {
 
                 <option value="">
 
-                  Noch nichts geplant
+                  Gericht auswählen …
 
                 </option>
 
@@ -2213,7 +2268,7 @@ function renderWochenansicht() {
     </section>
 
     <div class="druckbereich-unten">
-      <button class="secondary drucken-button" id="wochenDrucken">🖨️ PDF / Drucken</button>
+      <button class="secondary drucken-button" id="wochenDrucken">🖨️ Drucken / PDF</button>
     </div>
 
   `
@@ -2283,8 +2338,11 @@ function renderEinkaufsliste() {
         </div>
 
         <form id="einkaufForm" class="snack-hinzufuegen-zeile">
-          <input id="einkaufText" type="text" placeholder="Artikel hinzufügen …" autocomplete="off" required>
-          <button class="primary" type="submit">+ Hinzufügen</button>
+          <input id="einkaufText" type="text" placeholder="Artikel hinzufügen …" autocomplete="off" list="einkaufVorschlaege" required>
+          <datalist id="einkaufVorschlaege">
+            ${einkaufsVorschlaege().map(item => `<option value="${escapeHtml(item.text)}"></option>`).join('')}
+          </datalist>
+          <button class="primary" type="submit">Artikel hinzufügen</button>
         </form>
 
         ${aktiveListe.id === 'essen' ? `
@@ -2343,8 +2401,27 @@ function renderEinkaufsliste() {
 
     ${listenInhalt}
 
+    ${aktiveListe ? `
+      <section class="druckansicht druck-einkaufsliste">
+        <h1>Einkaufsliste · ${escapeHtml(aktiveListe.name)}</h1>
+        <p class="druck-zeitraum">${formatiereWochenZeitraum()}</p>
+        <div class="druck-einkauf-items">
+          ${aktiveListe.eintraege.map(eintrag => `
+            <div class="druck-einkauf-item ${eintrag.erledigt ? 'druck-erledigt' : ''}">
+              <span class="druck-check">□</span>
+              <div>
+                <strong>${escapeHtml(eintrag.text)}</strong>
+                ${eintrag.notiz ? `<span>${escapeHtml(eintrag.notiz)}</span>` : ''}
+                ${eintrag.quellen.length ? `<small>aus: ${eintrag.quellen.map(escapeHtml).join(', ')}</small>` : ''}
+              </div>
+            </div>
+          `).join('')}
+        </div>
+      </section>
+    ` : ''}
+
     <div class="druckbereich-unten">
-      <button class="secondary drucken-button" id="einkaufDrucken">🖨️ PDF / Drucken</button>
+      <button class="secondary drucken-button" id="einkaufDrucken">🖨️ Drucken / PDF</button>
     </div>
   `
 }
