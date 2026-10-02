@@ -1,0 +1,707 @@
+* {
+  box-sizing: border-box;
+}
+
+:root {
+  font-family: Inter, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  color: #202124;
+  background: #f5f6f8;
+  font-synthesis: none;
+}
+
+body {
+  margin: 0;
+  min-width: 320px;
+  min-height: 100vh;
+}
+
+button,
+input,
+select,
+textarea {
+  font: inherit;
+}
+
+button {
+  cursor: pointer;
+}
+
+.app-shell {
+  width: min(920px, calc(100% - 24px));
+  margin: 0 auto;
+  padding: 24px 0 60px;
+}
+
+.app-header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 20px;
+  margin-bottom: 28px;
+}
+
+h1,
+h2,
+h3,
+p {
+  margin-top: 0;
+}
+
+h1 {
+  margin-bottom: 4px;
+}
+
+.app-header p,
+.seitenkopf p,
+.hinweis {
+  color: #6b7280;
+  margin-bottom: 0;
+}
+
+.navigation {
+  display: flex;
+  gap: 8px;
+  background: white;
+  padding: 5px;
+  border-radius: 14px;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.06);
+}
+
+.navigation button {
+  border: 0;
+  background: transparent;
+  padding: 10px 14px;
+  border-radius: 10px;
+}
+
+.navigation button.aktiv {
+  background: #202124;
+  color: white;
+}
+
+.seitenkopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.primary,
+.secondary,
+.danger {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+}
+
+.primary {
+  background: #202124;
+  color: white;
+}
+
+.secondary {
+  background: #eef0f3;
+  color: #202124;
+}
+
+.danger {
+  background: #f5eeee;
+  color: #7d2424;
+}
+
+.tage-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.tageskarte,
+.verwaltung-karte {
+  background: white;
+  border-radius: 18px;
+  padding: 20px;
+  box-shadow: 0 3px 16px rgba(0, 0, 0, 0.06);
+}
+
+.tageskopf {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  padding-bottom: 14px;
+  border-bottom: 1px solid #eceef1;
+}
+
+.tageskopf h3 {
+  margin: 0;
+  font-size: 1.35rem;
+}
+
+.feldgruppe {
+  margin-top: 18px;
+}
+
+.feldgruppe label,
+.labelzeile {
+  display: block;
+  font-weight: 700;
+  margin-bottom: 8px;
+}
+
+.labelzeile {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.anzahl {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 24px;
+  height: 24px;
+  border-radius: 999px;
+  background: #eef0f3;
+  font-size: 0.8rem;
+}
+
+select,
+input,
+textarea {
+  width: 100%;
+  border: 1px solid #d7dbe0;
+  border-radius: 10px;
+  padding: 11px 12px;
+  background: white;
+}
+
+textarea {
+  resize: vertical;
+}
+
+.auswahl-info,
+.leertext,
+small {
+  color: #737982;
+  font-size: 0.88rem;
+}
+
+.auswahl-info {
+  margin-top: 6px;
+}
+
+.snack-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  min-height: 28px;
+}
+
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 7px 9px 7px 12px;
+  background: #eef0f3;
+  border-radius: 999px;
+}
+
+.chip button {
+  border: 0;
+  background: transparent;
+  font-size: 1.1rem;
+  line-height: 1;
+  padding: 0 3px;
+}
+
+.snack-hinzufuegen-zeile {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.verwaltung-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 18px;
+  align-items: start;
+}
+
+.eingabe-form {
+  display: grid;
+  grid-template-columns: 1.3fr 1fr auto;
+  gap: 8px;
+  margin: 16px 0 20px;
+}
+
+.snack-form {
+  grid-template-columns: 1fr auto;
+}
+
+.stammdaten-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.stammdaten-zeile {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  border-top: 1px solid #eceef1;
+  padding-top: 10px;
+}
+
+.stammdaten-text {
+  flex: 1;
+  min-width: 0;
+}
+
+.stammdaten-text strong,
+.stammdaten-text small {
+  display: block;
+  overflow-wrap: anywhere;
+}
+
+.icon-button {
+  border: 0;
+  background: transparent;
+  font-size: 1.5rem;
+  padding: 4px;
+}
+
+@media (max-width: 720px) {
+  .app-header,
+  .seitenkopf {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .navigation {
+    width: 100%;
+  }
+
+  .navigation button {
+    flex: 1;
+  }
+
+  .verwaltung-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .eingabe-form {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 520px) {
+  .app-shell {
+    width: min(100% - 14px, 920px);
+    padding-top: 12px;
+  }
+
+  .tageskarte,
+  .verwaltung-karte {
+    padding: 15px;
+    border-radius: 14px;
+  }
+
+  .snack-hinzufuegen-zeile {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* --------------------------------------------------
+   KOMPAKTE ANSICHTEN / NEUE HAUPTNAVIGATION
+   -------------------------------------------------- */
+
+.navigation {
+  flex-wrap: wrap;
+}
+
+/* Gerichteingabe bewusst untereinander */
+.eingabe-form {
+  grid-template-columns: 1fr;
+}
+
+/* Wochenplan kompakter */
+.tage-liste {
+  gap: 10px;
+}
+
+.tageskarte {
+  padding: 14px 16px;
+}
+
+.tageskopf {
+  display: grid;
+  grid-template-columns: auto minmax(120px, 1fr) auto;
+  gap: 8px;
+  padding-bottom: 9px;
+}
+
+.tageskopf h3 {
+  font-size: 1.08rem;
+  white-space: nowrap;
+}
+
+.tagesnotiz {
+  padding: 7px 9px;
+  min-width: 0;
+  font-size: .9rem;
+}
+
+.tageskarte .feldgruppe {
+  margin-top: 10px;
+}
+
+.tageskarte .feldgruppe label,
+.tageskarte .labelzeile {
+  margin-bottom: 5px;
+}
+
+.tageskarte select,
+.tageskarte input {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}
+
+.tageskarte .snack-chips {
+  min-height: 0;
+  gap: 5px;
+}
+
+.tageskarte .chip {
+  padding: 5px 7px 5px 9px;
+}
+
+.tageskarte .snack-hinzufuegen-zeile {
+  margin-top: 6px;
+}
+
+/* Snack-Stammdaten: eine Zeile statt kleiner Hochhäuser */
+.aktions-buttons {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+
+.aktions-buttons button {
+  width: auto;
+  padding: 8px 10px;
+}
+
+.stammdaten-zeile {
+  padding: 7px 0;
+}
+
+/* Einkaufsliste: freie Mengennotiz unter dem Artikel */
+.einkauf-notiz {
+  margin-top: 6px;
+  padding: 7px 9px;
+  font-size: .9rem;
+}
+
+@media (max-width: 520px) {
+  .navigation {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 6px;
+  }
+
+  .navigation button {
+    width: 100%;
+    padding: 9px 7px;
+    font-size: .88rem;
+  }
+
+  .tageskarte {
+    padding: 11px 12px;
+  }
+
+  .tageskopf {
+    grid-template-columns: auto minmax(80px, 1fr) auto;
+  }
+
+  .tageskopf h3 {
+    font-size: .98rem;
+  }
+
+  .tageskopf .tag-wuerfeln {
+    padding: 7px 8px;
+    font-size: .82rem;
+  }
+
+  .tagesnotiz {
+    font-size: .82rem;
+  }
+
+  /* Im Wochenplan Auswahl + Hinzufügen kompakt nebeneinander lassen */
+  .tageskarte .snack-hinzufuegen-zeile {
+    grid-template-columns: minmax(0, 1fr) auto;
+  }
+
+  .tageskarte .snack-hinzufuegen-zeile button {
+    padding-left: 9px;
+    padding-right: 9px;
+  }
+
+  /* Snackverwaltung explizit einzeilig */
+  .stammdaten-zeile {
+    gap: 7px;
+  }
+
+  .aktions-buttons {
+    gap: 4px;
+  }
+
+  .aktions-buttons button {
+    padding: 7px 8px;
+    font-size: .86rem;
+  }
+}
+
+/* Browser-Druckdialog kann direkt als PDF speichern. */
+@media print {
+  body {
+    background: white;
+  }
+
+  .app-shell {
+    width: 100%;
+    max-width: none;
+    padding: 0;
+  }
+
+  .app-header,
+  .wochen-navigation,
+  .drucken-button,
+  #wocheWuerfeln,
+  #zutatenUebernehmen,
+  #einkaufForm,
+  #einkaufAllesLoeschen,
+  #einkaufErledigteLoeschen,
+  .tag-wuerfeln,
+  .snack-hinzufuegen-zeile,
+  .snack-entfernen,
+  .einkauf-loeschen,
+  .gegessen-button {
+    display: none !important;
+  }
+
+  .tageskarte,
+  .verwaltung-karte {
+    box-shadow: none;
+    border: 1px solid #ddd;
+    break-inside: avoid;
+  }
+
+  .tagesnotiz,
+  .einkauf-notiz,
+  select {
+    border: 0;
+    padding-left: 0;
+    padding-right: 0;
+    background: transparent;
+  }
+}
+
+/* --------------------------------------------------
+   UPDATE: noch kompakter + mehrere Einkaufslisten
+   -------------------------------------------------- */
+
+/* Oben nur noch die Navigation, kein doppelter App-Titel. */
+.app-header {
+  display: block;
+  margin-bottom: 16px;
+}
+
+.navigation {
+  width: 100%;
+}
+
+/* Wochenkarten noch etwas kompakter. */
+.gegessen-button.klein {
+  margin-top: 6px;
+  padding: 5px 8px;
+  font-size: .78rem;
+  border-radius: 8px;
+}
+
+.snack-bestaende {
+  margin-bottom: 5px;
+}
+
+/* Einheitliche Wochen-Navigation ohne Inline-CSS. */
+.wochen-navigation {
+  display: grid;
+  grid-template-columns: 1fr 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+/* Mehrere Einkaufslisten als kompakte aufklappbare Buttons. */
+.einkaufslisten-buttons {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 10px;
+}
+
+.listen-button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 10px;
+  padding: 9px 12px;
+  background: #eef0f3;
+  color: #202124;
+}
+
+.listen-button.aktiv {
+  background: #202124;
+  color: white;
+}
+
+.listen-button span {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 21px;
+  height: 21px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(127, 127, 127, .16);
+  font-size: .75rem;
+}
+
+.neue-liste-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px;
+  margin-bottom: 14px;
+}
+
+.einkaufslisten-inhalt {
+  margin-bottom: 14px;
+}
+
+.listen-kopf {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 12px;
+}
+
+.listen-kopf h3,
+.listen-kopf p {
+  margin-bottom: 0;
+}
+
+.zutaten-button {
+  margin-top: 10px;
+}
+
+.einkaufs-gruppe {
+  margin-top: 10px;
+}
+
+.einkaufs-zeile {
+  align-items: center;
+}
+
+.einkaufs-zeile > .einkauf-erledigt {
+  width: 23px;
+  height: 23px;
+  flex: 0 0 23px;
+}
+
+.durchgestrichen {
+  text-decoration: line-through;
+  opacity: .55;
+}
+
+.erledigt-details {
+  margin-top: 14px;
+  border-top: 1px solid #eceef1;
+  padding-top: 10px;
+}
+
+.erledigt-details summary {
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.liste-leeren {
+  margin-top: 14px;
+}
+
+.druckbereich-unten {
+  display: flex;
+  justify-content: center;
+  margin-top: 20px;
+}
+
+.druckbereich-unten .drucken-button {
+  width: min(100%, 360px);
+}
+
+@media (max-width: 520px) {
+  .app-shell {
+    padding-top: 8px;
+  }
+
+  .app-header {
+    margin-bottom: 12px;
+  }
+
+  .wochen-navigation {
+    gap: 5px;
+  }
+
+  .wochen-navigation button {
+    padding: 7px 5px;
+    font-size: .76rem;
+  }
+
+  .tageskarte .feldgruppe {
+    margin-top: 7px;
+  }
+
+  .neue-liste-form {
+    grid-template-columns: 1fr;
+  }
+
+  .einkaufslisten-buttons {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .listen-button {
+    justify-content: space-between;
+  }
+
+  .listen-kopf {
+    align-items: flex-start;
+  }
+}
+
+@media print {
+  .einkaufslisten-buttons,
+  .neue-liste-form,
+  .liste-loeschen,
+  .liste-leeren,
+  .zutaten-button {
+    display: none !important;
+  }
+
+  /* Beim Drucken nur die gerade aufgeklappte Einkaufsliste. */
+  .einkaufslisten-inhalt {
+    display: block !important;
+  }
+}
