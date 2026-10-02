@@ -883,3 +883,39 @@ small {
     display: none !important;
   }
 }
+
+
+/* --------------------------------------------------
+   CLOUD-SYNCHRONISATION
+   -------------------------------------------------- */
+
+.sync-karte {
+  grid-column: 1 / -1;
+}
+
+.sync-form {
+  display: grid;
+  gap: 9px;
+  margin-top: 12px;
+}
+
+.sync-aktionen {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.sync-status {
+  font-weight: 700;
+}
+
+@media (max-width: 620px) {
+  .sync-karte {
+    grid-column: auto;
+  }
+
+  .sync-aktionen {
+    display: grid;
+    grid-template-columns: 1fr;
+  }
+}
