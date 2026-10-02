@@ -1,33 +1,43 @@
-# Menüplaner v3
+# Menüplaner
 
-Komplett neuer Projektordner für Vite + Vanilla JavaScript.
+Browserbasierter Wochen- und Einkaufsplaner mit Vite und Vanilla JavaScript.
 
-## Enthalten
+## Funktionen
 
-- Wochenansicht Freitag bis Donnerstag
-- Wochentage untereinander
-- separate Ansicht „Verwaltung“
-- Gerichte als Stammdaten mit Kategorie und Favorit
-- Snacks als eigene Stammdaten ohne Kategorie/Favorit
-- pro Tag ein Gericht
-- pro Tag beliebig viele Snacks, auch derselbe Snack mehrfach
-- Notiz pro Tag
-- Zufallsplanung der ganzen Woche ohne unnötige Gericht-Doppelungen
-- einzelne Tage neu würfeln
-- Speicherung in localStorage
-- vorhandene alte Gerichteliste aus `localStorage["gerichte"]` wird beim ersten Start übernommen, falls vorhanden
-- responsive Darstellung für Laptop, Tablet und Handy
+- Wochenplan von Freitag bis Donnerstag mit eigener Speicherung je Woche
+- Gerichte mit Kategorie, Favorit, „zuletzt gegessen“ und Zutaten
+- Snacks als eigene Stammdaten
+- gewichtete Zufallsplanung für einzelne Tage oder die ganze Woche
+- Notizen pro Tag
+- mehrere Einkaufslisten pro Woche
+- feste Einkaufsliste **Essen** für Zutaten aus geplanten Gerichten
+- gleiche Zutaten werden zusammengeführt; alle Quellgerichte werden angezeigt
+- freie Mengennotiz je Einkaufsartikel
+- Artikelhistorie für Vorschläge beim Tippen; häufig verwendete Artikel werden bevorzugt
+- kompakte Druck-/PDF-Ansicht für Wochenplan und Einkaufsliste
+- Speicherung im Browser über localStorage
 
-## Start
+## Entwicklung
 
-Ordner in VS Code öffnen.
+```bash
+npm.cmd install
+npm.cmd run dev
+```
 
-Im Terminal:
+Im lokalen WLAN:
 
-    npm.cmd install
+```bash
+npm.cmd run dev -- --host 0.0.0.0
+```
 
-Danach:
+Produktions-Build:
 
-    npm.cmd run dev
+```bash
+npm.cmd run build
+```
 
-Die von Vite angezeigte lokale Adresse im Browser öffnen.
+## GitHub Pages
+
+Die App wird über GitHub Actions aus `main` gebaut und veröffentlicht. Für GitHub Pages ist in `vite.config.js` die Basis `/menueplaner/` gesetzt.
+
+Hinweis: localStorage ist an Browser und Adresse gebunden. Daten werden daher nicht automatisch zwischen Handy, Laptop, localhost und GitHub Pages synchronisiert.
