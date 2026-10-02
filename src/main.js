@@ -376,6 +376,24 @@ async function syncAnmelden(email, passwort) {
   await initialisiereCloudSync()
 }
 
+async function syncBestaetigungErneutSenden(email) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/resend`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      type: 'signup',
+      email,
+      options: {
+        email_redirect_to: 'https://gleusch-cloud.github.io/menueplaner/'
+      }
+    })
+  })
+  const daten = await response.json().catch(() => ({}))
+  if (!response.ok) {
+    throw new Error(daten?.msg || daten?.error_description || daten?.message || 'Bestätigungsmail konnte nicht erneut gesendet werden.')
+  }
+}
+
 async function syncRegistrieren(email, passwort) {
   const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
     method: 'POST',
@@ -566,6 +584,7 @@ function renderDatenansicht() {
             <div class="sync-aktionen">
               <button class="primary" type="submit">Anmelden</button>
               <button class="secondary" id="syncRegistrieren" type="button">Konto erstellen</button>
+              <button class="secondary" id="syncBestaetigung" type="button">Bestätigungsmail erneut senden</button>
             </div>
             <p id="syncMeldung" class="hinweis"></p>
           </form>
@@ -624,6 +643,22 @@ function verbindeDatenEvents() {
     meldung.textContent = 'Konto wird erstellt …'
     try {
       await syncRegistrieren(email, passwort)
+    } catch (fehler) {
+      meldung.textContent = fehler.message
+    }
+  })
+
+  document.querySelector('#syncBestaetigung')?.addEventListener('click', async () => {
+    const meldung = document.querySelector('#syncMeldung')
+    const email = document.querySelector('#syncEmail').value.trim()
+    if (!email) {
+      meldung.textContent = 'Bitte zuerst deine E-Mail-Adresse eingeben.'
+      return
+    }
+    meldung.textContent = 'Neue Bestätigungsmail wird angefordert …'
+    try {
+      await syncBestaetigungErneutSenden(email)
+      meldung.textContent = 'Bestätigungsmail wurde erneut angefordert. Bitte prüfe auch den Spam-Ordner.'
     } catch (fehler) {
       meldung.textContent = fehler.message
     }
