@@ -64,6 +64,14 @@ const STORAGE = {
 
 }
 
+const SUPABASE_URL = 'https://txzwiiphpoqtqfdirgqb.supabase.co'
+const SUPABASE_KEY = 'sb_publishable_-lzgsKve3h0aaRQ5Mm9FYw_jaoo7KFL'
+const SYNC_SESSION_KEY = 'menueplaner_sync_session'
+let syncSession = ladeSyncSession()
+let syncBereit = false
+let syncTimer = null
+let syncStatus = 'Nur lokal'
+
 
 
 const alteGerichte = JSON.parse(
@@ -276,11 +284,176 @@ function speichern() {
 
   )
 
+  planeCloudSync()
+
 }
 
 
 
 
+
+// --------------------------------------------------
+// CLOUD-SYNCHRONISATION
+// --------------------------------------------------
+
+function ladeSyncSession() {
+  try {
+    return JSON.parse(localStorage.getItem(SYNC_SESSION_KEY) || 'null')
+  } catch {
+    return null
+  }
+}
+
+function speichereSyncSession(session) {
+  syncSession = session
+  if (session) localStorage.setItem(SYNC_SESSION_KEY, JSON.stringify(session))
+  else localStorage.removeItem(SYNC_SESSION_KEY)
+}
+
+function lokaleSyncDaten() {
+  const daten = {}
+  Object.entries(STORAGE).forEach(([name, key]) => {
+    const roh = localStorage.getItem(key)
+    daten[name] = roh === null ? null : JSON.parse(roh)
+  })
+  return daten
+}
+
+function uebernehmeSyncDaten(daten) {
+  if (!daten || typeof daten !== 'object') return
+  Object.entries(STORAGE).forEach(([name, key]) => {
+    if (!(name in daten)) return
+    if (daten[name] === null) localStorage.removeItem(key)
+    else localStorage.setItem(key, JSON.stringify(daten[name]))
+  })
+}
+
+async function supabaseFetch(pfad, optionen = {}, erneut = true) {
+  const headers = {
+    apikey: SUPABASE_KEY,
+    'Content-Type': 'application/json',
+    ...(optionen.headers || {})
+  }
+  if (syncSession?.access_token) headers.Authorization = `Bearer ${syncSession.access_token}`
+
+  let response = await fetch(`${SUPABASE_URL}${pfad}`, { ...optionen, headers })
+  if (response.status === 401 && erneut && syncSession?.refresh_token) {
+    const ok = await erneuereSyncSession()
+    if (ok) return supabaseFetch(pfad, optionen, false)
+  }
+  return response
+}
+
+async function erneuereSyncSession() {
+  if (!syncSession?.refresh_token) return false
+  try {
+    const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=refresh_token`, {
+      method: 'POST',
+      headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: syncSession.refresh_token })
+    })
+    if (!response.ok) {
+      speichereSyncSession(null)
+      syncBereit = false
+      return false
+    }
+    speichereSyncSession(await response.json())
+    return true
+  } catch {
+    return false
+  }
+}
+
+async function syncAnmelden(email, passwort) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/token?grant_type=password`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: passwort })
+  })
+  const daten = await response.json()
+  if (!response.ok) throw new Error(daten?.msg || daten?.error_description || 'Anmeldung fehlgeschlagen.')
+  speichereSyncSession(daten)
+  await initialisiereCloudSync()
+}
+
+async function syncRegistrieren(email, passwort) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email, password: passwort })
+  })
+  const daten = await response.json()
+  if (!response.ok) throw new Error(daten?.msg || daten?.error_description || 'Registrierung fehlgeschlagen.')
+  if (!daten.access_token) throw new Error('Konto erstellt. Bitte bestätige zuerst die E-Mail und melde dich danach an.')
+  speichereSyncSession(daten)
+  await initialisiereCloudSync()
+}
+
+async function initialisiereCloudSync() {
+  if (!syncSession?.access_token) return
+  syncStatus = 'Synchronisiere …'
+  try {
+    const response = await supabaseFetch('/rest/v1/menueplaner_sync?select=daten,updated_at&limit=1')
+    if (!response.ok) throw new Error('Cloud-Daten konnten nicht geladen werden.')
+    const zeilen = await response.json()
+
+    if (zeilen.length) {
+      uebernehmeSyncDaten(zeilen[0].daten)
+      syncBereit = true
+      syncStatus = 'Synchronisiert'
+      location.reload()
+      return
+    }
+
+    syncBereit = true
+    await cloudSpeichern()
+  } catch (fehler) {
+    syncBereit = false
+    syncStatus = 'Sync-Fehler'
+    console.error(fehler)
+  }
+}
+
+function planeCloudSync() {
+  if (!syncBereit || !syncSession?.access_token) return
+  clearTimeout(syncTimer)
+  syncStatus = 'Änderungen offen …'
+  syncTimer = setTimeout(cloudSpeichern, 700)
+}
+
+async function cloudSpeichern() {
+  if (!syncBereit || !syncSession?.access_token) return
+  syncStatus = 'Synchronisiere …'
+  try {
+    const response = await supabaseFetch('/rest/v1/menueplaner_sync?on_conflict=user_id', {
+      method: 'POST',
+      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      body: JSON.stringify({
+        user_id: syncSession.user.id,
+        daten: lokaleSyncDaten(),
+        updated_at: new Date().toISOString()
+      })
+    })
+    if (!response.ok) throw new Error(await response.text())
+    syncStatus = 'Synchronisiert'
+  } catch (fehler) {
+    syncStatus = 'Offline – lokal gespeichert'
+    console.error(fehler)
+  }
+}
+
+async function cloudNeuLaden() {
+  if (!syncSession?.access_token) return
+  syncBereit = false
+  await initialisiereCloudSync()
+}
+
+function syncAbmelden() {
+  syncBereit = false
+  speichereSyncSession(null)
+  syncStatus = 'Nur lokal'
+  render()
+}
 
 // --------------------------------------------------
 // BACKUP UND WIEDERHERSTELLUNG
@@ -358,15 +531,41 @@ async function backupWiederherstellen(datei) {
 }
 
 function renderDatenansicht() {
+  const angemeldet = Boolean(syncSession?.access_token)
+  const email = syncSession?.user?.email || ''
+
   return `
     <section class="seitenkopf">
       <div>
-        <h2>Daten & Backup</h2>
-        <p>Deine Daten liegen auf diesem Gerät. Ein Backup schützt sie, falls Browserdaten gelöscht werden.</p>
+        <h2>Daten & Synchronisation</h2>
+        <p>Lokal speichern, online synchronisieren und zusätzlich ein Backup behalten. Dreifache Absicherung, weil Browser offenbar Vertrauen erst verdienen müssen.</p>
       </div>
     </section>
 
     <section class="backup-grid">
+      <article class="verwaltung-karte backup-karte sync-karte">
+        <h3>☁️ Synchronisation</h3>
+        ${angemeldet ? `
+          <p><strong>Angemeldet:</strong> ${escapeHtml(email)}</p>
+          <p class="sync-status">Status: ${escapeHtml(syncStatus)}</p>
+          <div class="sync-aktionen">
+            <button class="primary" id="syncJetzt">Jetzt synchronisieren</button>
+            <button class="secondary" id="syncAbmelden">Abmelden</button>
+          </div>
+        ` : `
+          <p>Mit demselben Konto auf Handy und Laptop anmelden. Beim ersten Gerät werden vorhandene lokale Daten übernommen. Weitere Geräte laden anschließend diesen gemeinsamen Stand.</p>
+          <form id="syncForm" class="sync-form">
+            <input id="syncEmail" type="email" autocomplete="email" placeholder="E-Mail-Adresse" required>
+            <input id="syncPasswort" type="password" autocomplete="current-password" placeholder="Passwort (mind. 6 Zeichen)" minlength="6" required>
+            <div class="sync-aktionen">
+              <button class="primary" type="submit">Anmelden</button>
+              <button class="secondary" id="syncRegistrieren" type="button">Konto erstellen</button>
+            </div>
+            <p id="syncMeldung" class="hinweis"></p>
+          </form>
+        `}
+      </article>
+
       <article class="verwaltung-karte backup-karte">
         <h3>💾 Backup erstellen</h3>
         <p>Speichert Gerichte, Snacks, Wochenpläne, Einkaufslisten und Einkaufshistorie in einer Datei.</p>
@@ -382,7 +581,7 @@ function renderDatenansicht() {
 
       <article class="verwaltung-karte backup-hinweis">
         <strong>Automatisches Speichern ist aktiv.</strong>
-        <p>Änderungen werden direkt lokal gespeichert. Zusätzlich wird beim Verlassen oder Ausblenden der Seite noch einmal gespeichert.</p>
+        <p>Änderungen werden sofort lokal gespeichert. Wenn du angemeldet bist, werden sie zusätzlich automatisch online synchronisiert.</p>
       </article>
     </section>
   `
@@ -393,6 +592,39 @@ function verbindeDatenEvents() {
   document.querySelector('#backupDatei')?.addEventListener('change', event => {
     backupWiederherstellen(event.target.files?.[0])
   })
+
+  document.querySelector('#syncForm')?.addEventListener('submit', async event => {
+    event.preventDefault()
+    const meldung = document.querySelector('#syncMeldung')
+    meldung.textContent = 'Anmeldung läuft …'
+    try {
+      await syncAnmelden(
+        document.querySelector('#syncEmail').value.trim(),
+        document.querySelector('#syncPasswort').value
+      )
+    } catch (fehler) {
+      meldung.textContent = fehler.message
+    }
+  })
+
+  document.querySelector('#syncRegistrieren')?.addEventListener('click', async () => {
+    const meldung = document.querySelector('#syncMeldung')
+    const email = document.querySelector('#syncEmail').value.trim()
+    const passwort = document.querySelector('#syncPasswort').value
+    if (!email || passwort.length < 6) {
+      meldung.textContent = 'Bitte E-Mail und ein Passwort mit mindestens 6 Zeichen eingeben.'
+      return
+    }
+    meldung.textContent = 'Konto wird erstellt …'
+    try {
+      await syncRegistrieren(email, passwort)
+    } catch (fehler) {
+      meldung.textContent = fehler.message
+    }
+  })
+
+  document.querySelector('#syncJetzt')?.addEventListener('click', cloudNeuLaden)
+  document.querySelector('#syncAbmelden')?.addEventListener('click', syncAbmelden)
 }
 
 // --------------------------------------------------
@@ -4451,3 +4683,7 @@ document.addEventListener('visibilitychange', () => {
 speichern()
 
 render()
+
+if (syncSession?.access_token) {
+  initialisiereCloudSync()
+}
