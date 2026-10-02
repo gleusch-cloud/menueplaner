@@ -15,7 +15,8 @@ Browserbasierter Wochen- und Einkaufsplaner mit Vite und Vanilla JavaScript.
 - freie Mengennotiz je Einkaufsartikel
 - Artikelhistorie für Vorschläge beim Tippen; häufig verwendete Artikel werden bevorzugt
 - kompakte Druck-/PDF-Ansicht für Wochenplan und Einkaufsliste
-- Speicherung im Browser über localStorage
+- automatisches lokales Speichern im Browser über localStorage
+- Backup als JSON-Datei und Wiederherstellung direkt in der App
 
 ## Entwicklung
 
@@ -40,4 +41,4 @@ npm.cmd run build
 
 Die App wird über GitHub Actions aus `main` gebaut und veröffentlicht. Für GitHub Pages ist in `vite.config.js` die Basis `/menueplaner/` gesetzt.
 
-Hinweis: localStorage ist an Browser und Adresse gebunden. Daten werden daher nicht automatisch zwischen Handy, Laptop, localhost und GitHub Pages synchronisiert.
+Hinweis: localStorage ist an Browser und Adresse gebunden. Daten werden daher nicht automatisch zwischen Handy, Laptop, localhost und GitHub Pages synchronisiert. Über **Daten → Backup herunterladen** kann eine Sicherungsdatei erstellt und später auf demselben oder einem anderen Gerät wiederhergestellt werden.
