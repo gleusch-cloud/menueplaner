@@ -283,6 +283,119 @@ function speichern() {
 
 
 // --------------------------------------------------
+// BACKUP UND WIEDERHERSTELLUNG
+// --------------------------------------------------
+
+function erstelleBackupDaten() {
+  speichern()
+
+  const daten = {}
+  Object.entries(STORAGE).forEach(([name, key]) => {
+    const roh = localStorage.getItem(key)
+    daten[name] = roh === null ? null : JSON.parse(roh)
+  })
+
+  return {
+    format: 'menueplaner-backup',
+    version: 1,
+    erstelltAm: new Date().toISOString(),
+    daten
+  }
+}
+
+function backupHerunterladen() {
+  const backup = erstelleBackupDaten()
+  const inhalt = JSON.stringify(backup, null, 2)
+  const blob = new Blob([inhalt], { type: 'application/json;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const link = document.createElement('a')
+  const datum = new Date().toISOString().slice(0, 10)
+
+  link.href = url
+  link.download = `menueplaner-backup-${datum}.json`
+  document.body.appendChild(link)
+  link.click()
+  link.remove()
+  URL.revokeObjectURL(url)
+}
+
+async function backupWiederherstellen(datei) {
+  if (!datei) return
+
+  let backup
+  try {
+    backup = JSON.parse(await datei.text())
+  } catch {
+    alert('Die Datei konnte nicht als Menüplaner-Backup gelesen werden.')
+    return
+  }
+
+  if (
+    backup?.format !== 'menueplaner-backup' ||
+    backup?.version !== 1 ||
+    !backup?.daten ||
+    typeof backup.daten !== 'object'
+  ) {
+    alert('Das ist kein gültiges Menüplaner-Backup.')
+    return
+  }
+
+  if (!confirm('Backup wirklich wiederherstellen? Die aktuell gespeicherten Daten dieses Browsers werden dadurch ersetzt.')) {
+    return
+  }
+
+  Object.entries(STORAGE).forEach(([name, key]) => {
+    if (!(name in backup.daten)) return
+    const wert = backup.daten[name]
+    if (wert === null) {
+      localStorage.removeItem(key)
+    } else {
+      localStorage.setItem(key, JSON.stringify(wert))
+    }
+  })
+
+  location.reload()
+}
+
+function renderDatenansicht() {
+  return `
+    <section class="seitenkopf">
+      <div>
+        <h2>Daten & Backup</h2>
+        <p>Deine Daten liegen auf diesem Gerät. Ein Backup schützt sie, falls Browserdaten gelöscht werden.</p>
+      </div>
+    </section>
+
+    <section class="backup-grid">
+      <article class="verwaltung-karte backup-karte">
+        <h3>💾 Backup erstellen</h3>
+        <p>Speichert Gerichte, Snacks, Wochenpläne, Einkaufslisten und Einkaufshistorie in einer Datei.</p>
+        <button class="primary" id="backupErstellen">Backup herunterladen</button>
+      </article>
+
+      <article class="verwaltung-karte backup-karte">
+        <h3>📥 Backup wiederherstellen</h3>
+        <p>Wähle eine zuvor gespeicherte Menüplaner-Backup-Datei. Die aktuellen Browserdaten werden erst nach deiner Bestätigung ersetzt.</p>
+        <label class="secondary datei-button" for="backupDatei">Backup-Datei auswählen</label>
+        <input id="backupDatei" class="backup-datei" type="file" accept="application/json,.json">
+      </article>
+
+      <article class="verwaltung-karte backup-hinweis">
+        <strong>Automatisches Speichern ist aktiv.</strong>
+        <p>Änderungen werden direkt lokal gespeichert. Zusätzlich wird beim Verlassen oder Ausblenden der Seite noch einmal gespeichert.</p>
+      </article>
+    </section>
+  `
+}
+
+function verbindeDatenEvents() {
+  document.querySelector('#backupErstellen')?.addEventListener('click', backupHerunterladen)
+  document.querySelector('#backupDatei')?.addEventListener('change', event => {
+    backupWiederherstellen(event.target.files?.[0])
+  })
+}
+
+// --------------------------------------------------
 
 // ID ERZEUGEN
 
@@ -1681,6 +1794,10 @@ function render() {
             🍎 Snacks
           </button>
 
+          <button class="${aktuelleAnsicht === 'daten' ? 'aktiv' : ''}" data-view="daten">
+            💾 Daten
+          </button>
+
 
 
         </nav>
@@ -1701,7 +1818,9 @@ function render() {
             ? renderEinkaufsliste()
             : aktuelleAnsicht === 'gerichte'
               ? renderVerwaltung('gerichte')
-              : renderVerwaltung('snacks')
+              : aktuelleAnsicht === 'snacks'
+                ? renderVerwaltung('snacks')
+                : renderDatenansicht()
 
       }
 
@@ -1732,6 +1851,14 @@ function render() {
   ) {
 
     verbindeEinkaufsEvents()
+
+  } else if (
+
+    aktuelleAnsicht === 'daten'
+
+  ) {
+
+    verbindeDatenEvents()
 
   } else {
 
@@ -4315,6 +4442,11 @@ function escapeHtml(wert) {
 // --------------------------------------------------
 
 
+
+window.addEventListener('pagehide', speichern)
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'hidden') speichern()
+})
 
 speichern()
 
