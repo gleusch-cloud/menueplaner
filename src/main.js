@@ -161,6 +161,22 @@ let einkaufslisten = ladeDaten(
 
 let einkaufsHistorie = ladeDaten(STORAGE.einkaufsHistorie, {})
 
+// Beim ersten Start nach dem Update vorhandene Einkaufsartikel als Historie übernehmen.
+if (!Object.keys(einkaufsHistorie).length) {
+  Object.values(einkaufslisten || {}).forEach(woche => {
+    const listen = Array.isArray(woche) ? [{ eintraege: woche }] : (woche?.listen || [])
+    listen.forEach(liste => {
+      ;(liste.eintraege || []).forEach(eintrag => {
+        const text = String(eintrag?.text || '').trim()
+        if (!text) return
+        const key = text.toLocaleLowerCase('de-DE')
+        const alt = einkaufsHistorie[key] || { text, anzahl: 0, zuletzt: null }
+        einkaufsHistorie[key] = { text, anzahl: Number(alt.anzahl || 0) + 1, zuletzt: alt.zuletzt }
+      })
+    })
+  })
+}
+
 let aktuelleAnsicht = 'woche'
 
 let bearbeitetesGerichtId = null
@@ -620,8 +636,8 @@ function einkaufsEintragHinzufuegen(text, quelle = 'manuell', listenId = offeneE
     if (quelle !== 'manuell' && !vorhanden.quellen.includes(quelle)) {
       vorhanden.quellen.push(quelle)
       vorhanden.quelle = 'gericht'
-      speichern()
     }
+    speichern()
     return false
   }
 
