@@ -1,4 +1,4 @@
-name: Sync Login Hotfix
+name: Final Sync Repair
 
 on:
   push:
@@ -11,11 +11,11 @@ permissions:
   id-token: write
 
 concurrency:
-  group: sync-login-hotfix
+  group: final-sync-repair
   cancel-in-progress: false
 
 jobs:
-  hotfix-and-deploy:
+  repair:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -23,124 +23,77 @@ jobs:
           ref: main
           fetch-depth: 0
 
-      - name: Patch sync login state
+      - name: Repair sync behavior
         shell: python
         run: |
           from pathlib import Path
           p = Path("src/main.js")
           s = p.read_text(encoding="utf-8")
 
-          old = """function speichereSyncSession(session) {
-            syncSession = session
-            if (session) localStorage.setItem(SYNC_SESSION_KEY, JSON.stringify(session))
-            else localStorage.removeItem(SYNC_SESSION_KEY)
-          }"""
-          new = """function syncBenutzerId() {
-            if (syncSession?.user?.id) return syncSession.user.id
-            const token = syncSession?.access_token
-            if (!token) return null
-            try {
-              const teil = token.split('.')[1]
-              if (!teil) return null
-              const basis = teil.replace(/-/g, '+').replace(/_/g, '/')
-              const gepolstert = basis.padEnd(Math.ceil(basis.length / 4) * 4, '=')
-              return JSON.parse(atob(gepolstert)).sub || null
-            } catch {
-              return null
-            }
-          }
-
-          function speichereSyncSession(session) {
-            syncSession = session
-            if (session) localStorage.setItem(SYNC_SESSION_KEY, JSON.stringify(session))
-            else localStorage.removeItem(SYNC_SESSION_KEY)
-          }"""
-          if old not in s:
-              raise SystemExit("session block not found")
-          s = s.replace(old, new, 1)
-
-          needle = """  speichereSyncSession(daten)
-            await initialisiereCloudSync()
-          }
-
-          async function syncBestaetigungErneutSenden"""
-          repl = """  speichereSyncSession(daten)
-            await initialisiereCloudSync()
-            render()
-          }
-
-          async function syncBestaetigungErneutSenden"""
-          if needle not in s:
-              raise SystemExit("login block not found")
-          s = s.replace(needle, repl, 1)
-
-          needle = """  speichereSyncSession(daten)
-            await initialisiereCloudSync()
-          }
-
-          async function initialisiereCloudSync()"""
-          repl = """  speichereSyncSession(daten)
-            await initialisiereCloudSync()
-            render()
-          }
-
-          async function initialisiereCloudSync()"""
-          if needle not in s:
-              raise SystemExit("register block not found")
-          s = s.replace(needle, repl, 1)
-
           a = s.index("async function initialisiereCloudSync()")
           b = s.index("\n\nfunction planeCloudSync()", a)
-          s = s[:a] + """async function initialisiereCloudSync() {
+          new_init = r'''async function initialisiereCloudSync() {
             if (!syncSession?.access_token) return false
             const userId = syncBenutzerId()
             if (!userId) {
               syncBereit = false
               syncStatus = 'Sync-Fehler'
-              render()
+              aktualisiereSyncAnzeige()
               return false
             }
 
             syncStatus = 'Synchronisiere …'
+            aktualisiereSyncAnzeige(true)
+
             try {
               const response = await supabaseFetch(
                 `/rest/v1/menueplaner_sync?user_id=eq.${encodeURIComponent(userId)}&select=daten,updated_at&limit=1`
               )
-              if (!response.ok) throw new Error('Cloud-Daten konnten nicht geladen werden.')
+              if (!response.ok) throw new Error(await response.text() || 'Cloud-Daten konnten nicht geladen werden.')
               const zeilen = await response.json()
 
               if (zeilen.length) {
-                uebernehmeSyncDaten(zeilen[0].daten)
+                const lokal = lokaleSyncDaten()
+                const remote = zeilen[0].daten || {}
                 syncBereit = true
-                syncStatus = 'Synchronisiert'
-                location.reload()
+                syncStatus = 'Synchronisiert ✓'
+
+                if (JSON.stringify(lokal) !== JSON.stringify(remote)) {
+                  uebernehmeSyncDaten(remote)
+                  location.reload()
+                  return true
+                }
+
+                aktualisiereSyncAnzeige()
                 return true
               }
 
               syncBereit = true
-              const gespeichert = await cloudSpeichern()
-              render()
-              return gespeichert
+              return await cloudSpeichern(true)
             } catch (fehler) {
               syncBereit = false
               syncStatus = 'Sync-Fehler'
               console.error(fehler)
-              render()
+              aktualisiereSyncAnzeige()
               return false
             }
-          }""" + s[b:]
+          }'''
+          s = s[:a] + new_init + s[b:]
 
           a = s.index("async function cloudSpeichern()")
           b = s.index("\n\nasync function cloudNeuLaden()", a)
-          s = s[:a] + """async function cloudSpeichern() {
+          new_save = r'''async function cloudSpeichern(anzeigeAktualisieren = false) {
             if (!syncBereit || !syncSession?.access_token) return false
             const userId = syncBenutzerId()
             if (!userId) {
               syncStatus = 'Sync-Fehler'
+              if (anzeigeAktualisieren) aktualisiereSyncAnzeige()
               return false
             }
 
             syncStatus = 'Synchronisiere …'
+            if (anzeigeAktualisieren) aktualisiereSyncAnzeige(true)
+
             try {
               const response = await supabaseFetch('/rest/v1/menueplaner_sync?on_conflict=user_id', {
                 method: 'POST',
@@ -152,33 +105,61 @@ jobs:
                 })
               })
               if (!response.ok) throw new Error(await response.text())
-              syncStatus = 'Synchronisiert'
+              syncStatus = `Synchronisiert ✓ · ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
+              if (anzeigeAktualisieren) aktualisiereSyncAnzeige()
               return true
             } catch (fehler) {
               syncStatus = 'Offline – lokal gespeichert'
               console.error(fehler)
+              if (anzeigeAktualisieren) aktualisiereSyncAnzeige()
               return false
             }
-          }""" + s[b:]
+          }'''
+          s = s[:a] + new_save + s[b:]
+
+          old = r'''async function cloudNeuLaden() {
+            if (!syncSession?.access_token) return
+            syncBereit = false
+            await initialisiereCloudSync()
+          }'''
+          new = r'''function aktualisiereSyncAnzeige(laufend = false) {
+            const status = document.querySelector('.sync-status')
+            const button = document.querySelector('#syncJetzt')
+            if (status) status.textContent = `Status: ${syncStatus}`
+            if (button) {
+              button.disabled = laufend
+              button.textContent = laufend ? 'Synchronisiere …' : 'Jetzt synchronisieren'
+            }
+          }
+
+          async function cloudNeuLaden() {
+            if (!syncSession?.access_token) return false
+            syncBereit = false
+            return await initialisiereCloudSync()
+          }'''
+          if old not in s:
+              raise SystemExit("cloudNeuLaden block not found")
+          s = s.replace(old, new, 1)
 
           p.write_text(s, encoding="utf-8")
 
-      - name: Commit hotfix
+      - name: Remove one-shot workflow
+        run: rm .github/workflows/sync-login-hotfix.yml
+
+      - name: Commit repair
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add src/main.js
-          git commit -m "Fix cloud sync after successful login"
+          git add src/main.js .github/workflows/sync-login-hotfix.yml
+          git commit -m "Repair and verify cloud synchronization"
           git push origin main
 
       - uses: actions/setup-node@v6
         with:
           node-version: 24
           cache: npm
-
       - run: npm ci
       - run: npm run build
-
       - uses: actions/configure-pages@v5
       - uses: actions/upload-pages-artifact@v4
         with:
