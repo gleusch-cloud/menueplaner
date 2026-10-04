@@ -491,10 +491,13 @@ async function initialisiereCloudSync() {
         uebernehmeSyncDaten(remote)
         // Zustand im laufenden Tab ebenfalls aktualisieren, ohne Reload-Schleife.
         gerichte = ladeDaten(STORAGE.gerichte, gerichte)
+        gerichte = Array.isArray(gerichte) ? gerichte.map(normalisiereGericht) : []
         snacks = ladeDaten(STORAGE.snacks, snacks)
-        wochenplaene = ladeDaten(STORAGE.wochenplaene, wochenplaene)
+        wochenPlaene = ladeDaten(STORAGE.wochenPlaene, wochenPlaene)
         einkaufslisten = ladeDaten(STORAGE.einkaufslisten, einkaufslisten)
+        einkaufsHistorie = ladeDaten(STORAGE.einkaufsHistorie, einkaufsHistorie)
         wochenStart = ladeWochenStart()
+        wochenplan = ladeWochenplan(wochenStart)
         render()
         return true
       }
