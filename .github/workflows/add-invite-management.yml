@@ -1,0 +1,80 @@
+name: Add Invite Management
+on:
+  workflow_dispatch:
+permissions:
+  contents: write
+  pages: write
+  id-token: write
+jobs:
+  update:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: main
+          fetch-depth: 0
+      - name: Patch app
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path("src/main.js"); s=p.read_text(encoding="utf-8")
+          marker="function renderDatenansicht() {"
+          insert=r'''async function ladeEinladungen() {
+  if (!syncSession?.access_token) return { admin: false, einladungen: [] }
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/einladungen-admin`, { headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${syncSession.access_token}` } })
+  if (response.status === 403) return { admin: false, einladungen: [] }
+  const daten = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(daten.error || 'Einladungen konnten nicht geladen werden.')
+  return { admin: true, einladungen: daten.einladungen || [] }
+}
+async function setzeEinladung(email, aktiv) {
+  const response = await fetch(`${SUPABASE_URL}/functions/v1/einladungen-admin`, { method: 'POST', headers: { apikey: SUPABASE_KEY, Authorization: `Bearer ${syncSession.access_token}`, 'Content-Type': 'application/json' }, body: JSON.stringify({ email, aktiv }) })
+  const daten = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(daten.error || 'Einladung konnte nicht geändert werden.')
+}
+function renderEinladungsverwaltung(einladungen) {
+  return `<article class="verwaltung-karte backup-karte sync-karte"><h3>👥 Benutzer freigeben</h3><p>Nur hier freigegebene E-Mail-Adressen dürfen ein neues Konto erstellen. Passwörter legt jeder Benutzer selbst fest.</p><form id="einladungForm" class="sync-form"><input id="einladungEmail" type="email" autocomplete="email" placeholder="E-Mail-Adresse freigeben" required><button class="primary" type="submit">+ Freigeben</button><p id="einladungMeldung" class="hinweis"></p></form><div class="einladungs-liste">${einladungen.length ? einladungen.map(e => `<div class="einladung-zeile"><span><strong>${escapeHtml(e.email)}</strong><br><small>${e.aktiv ? 'Freigegeben' : 'Gesperrt'}</small></span><button class="${e.aktiv ? 'secondary' : 'primary'} einladung-toggle" data-email="${escapeHtml(e.email)}" data-aktiv="${e.aktiv ? 'false' : 'true'}">${e.aktiv ? 'Sperren' : 'Freigeben'}</button></div>`).join('') : '<p class="hinweis">Noch keine Freigaben vorhanden.</p>'}</div></article>`
+}
+async function ladeEinladungsverwaltungInAnsicht() {
+  const platz=document.querySelector('#einladungsVerwaltung'); if(!platz || !syncSession?.access_token) return
+  try { const {admin,einladungen}=await ladeEinladungen(); if(!admin){platz.remove();return}; platz.innerHTML=renderEinladungsverwaltung(einladungen); verbindeEinladungsEvents() }
+  catch(fehler){ platz.innerHTML=`<article class="verwaltung-karte backup-karte"><h3>👥 Benutzer freigeben</h3><p class="hinweis">${escapeHtml(fehler.message)}</p></article>` }
+}
+function verbindeEinladungsEvents() {
+  document.querySelector('#einladungForm')?.addEventListener('submit', async event => { event.preventDefault(); const email=document.querySelector('#einladungEmail').value.trim(); const meldung=document.querySelector('#einladungMeldung'); meldung.textContent='Wird freigegeben …'; try{await setzeEinladung(email,true);await ladeEinladungsverwaltungInAnsicht()}catch(fehler){meldung.textContent=fehler.message} })
+  document.querySelectorAll('.einladung-toggle').forEach(button => button.addEventListener('click', async()=>{button.disabled=true;try{await setzeEinladung(button.dataset.email,button.dataset.aktiv==='true');await ladeEinladungsverwaltungInAnsicht()}catch(fehler){alert(fehler.message);button.disabled=false}}))
+}
+
+'''
+          if "async function ladeEinladungen()" not in s: s=s.replace(marker,insert+marker,1)
+          needle='''      <article class="verwaltung-karte backup-karte">
+        <h3>💾 Backup erstellen</h3>'''
+          repl='''      ${angemeldet ? '<div id="einladungsVerwaltung"></div>' : ''}
+
+      <article class="verwaltung-karte backup-karte">
+        <h3>💾 Backup erstellen</h3>'''
+          if 'id="einladungsVerwaltung"' not in s: s=s.replace(needle,repl,1)
+          eventneedle="function verbindeDatenEvents() {"
+          if "function verbindeDatenEvents() {\n  ladeEinladungsverwaltungInAnsicht()" not in s: s=s.replace(eventneedle,eventneedle+"\n  ladeEinladungsverwaltungInAnsicht()",1)
+          p.write_text(s,encoding="utf-8")
+          css=Path("src/style.css"); cs=css.read_text(encoding="utf-8")
+          if ".einladung-zeile" not in cs: cs += "\n.einladungs-liste{display:grid;gap:.65rem;margin-top:1rem}.einladung-zeile{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 0;border-top:1px solid var(--border,#ddd)}.einladung-zeile small{opacity:.7}\n"
+          css.write_text(cs,encoding="utf-8")
+      - uses: actions/setup-node@v6
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - name: Commit
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add src/main.js src/style.css
+          git commit -m "Add admin invite management"
+          git push origin main
+      - uses: actions/configure-pages@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: dist
+      - uses: actions/deploy-pages@v4
