@@ -1,3 +1,4 @@
+# deploy trigger: rpc-parser-fix
 name: Menüplaner veröffentlichen
 
 on:
