@@ -1,5 +1,5 @@
 name: Add Invite Management
-on:
+'on':
   push:
     paths:
       - '.github/workflows/add-invite-management.yml'
