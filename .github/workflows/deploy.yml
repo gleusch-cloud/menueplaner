@@ -49,3 +49,5 @@ jobs:
       - name: Veröffentlichen
         id: deployment
         uses: actions/deploy-pages@v4
+
+# deploy trigger: invite-management
