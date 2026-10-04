@@ -70,6 +70,7 @@ const SYNC_SESSION_KEY = 'menueplaner_sync_session'
 const AUTH_REDIRECT_URL = 'https://gleusch-cloud.github.io/menueplaner/'
 let syncSession = ladeSyncSession()
 let syncBereit = false
+let syncInitialisiert = false
 let syncTimer = null
 let syncStatus = 'Nur lokal'
 
@@ -503,10 +504,21 @@ async function initialisiereCloudSync() {
 }
 
 function planeCloudSync() {
-  if (!syncBereit || !syncSession?.access_token) return
+  if (!syncSession?.access_token) return
   clearTimeout(syncTimer)
+
+  if (!syncBereit) {
+    if (!syncInitialisiert) {
+      syncInitialisiert = true
+      queueMicrotask(() => {
+        initialisiereCloudSync().finally(() => { syncInitialisiert = false })
+      })
+    }
+    return
+  }
+
   syncStatus = 'Änderungen offen …'
-  syncTimer = setTimeout(cloudSpeichern, 700)
+  syncTimer = setTimeout(() => cloudSpeichern(false), 700)
 }
 
 async function cloudSpeichern(anzeigeAktualisieren = false) {
@@ -567,11 +579,17 @@ function aktualisiereSyncAnzeige(laufend = false) {
 async function cloudNeuLaden() {
   if (!syncSession?.access_token) return false
   syncBereit = false
-  return await initialisiereCloudSync()
+  syncInitialisiert = true
+  try {
+    return await initialisiereCloudSync()
+  } finally {
+    syncInitialisiert = false
+  }
 }
 
 function syncAbmelden() {
   syncBereit = false
+  syncInitialisiert = false
   speichereSyncSession(null)
   syncStatus = 'Nur lokal'
   render()
@@ -4968,11 +4986,12 @@ document.addEventListener('visibilitychange', () => {
   if (document.visibilityState === 'hidden') speichern()
 })
 
-speichern()
-
 const authRueckkehr = uebernehmeAuthRueckkehr()
 render()
 
 if (syncSession?.access_token) {
-  initialisiereCloudSync()
+  syncInitialisiert = true
+  initialisiereCloudSync().finally(() => { syncInitialisiert = false })
+} else {
+  speichern()
 }
