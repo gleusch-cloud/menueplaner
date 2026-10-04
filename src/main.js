@@ -393,6 +393,27 @@ async function syncAnmelden(email, passwort) {
   render()
 }
 
+async function syncPasswortResetAnfordern(email) {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/recover?redirect_to=${encodeURIComponent(AUTH_REDIRECT_URL)}`, {
+    method: 'POST',
+    headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
+    body: JSON.stringify({ email })
+  })
+  const daten = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(daten?.msg || daten?.error_description || daten?.message || 'Passwort-Mail konnte nicht gesendet werden.')
+}
+
+async function syncPasswortAendern(passwort) {
+  if (!syncSession?.access_token) throw new Error('Keine gültige Anmeldung vorhanden.')
+  const response = await supabaseFetch('/auth/v1/user', {
+    method: 'PUT',
+    body: JSON.stringify({ password: passwort })
+  })
+  const daten = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(daten?.msg || daten?.error_description || daten?.message || 'Passwort konnte nicht geändert werden.')
+  return daten
+}
+
 async function syncBestaetigungErneutSenden(email) {
   const response = await fetch(`${SUPABASE_URL}/auth/v1/resend?redirect_to=${encodeURIComponent(AUTH_REDIRECT_URL)}`, {
     method: 'POST',
@@ -562,9 +583,11 @@ function uebernehmeAuthRueckkehr() {
     user
   })
 
+  const rueckkehrTyp = hash.get('type') || ''
   history.replaceState(null, '', location.pathname + location.search)
-  syncStatus = 'E-Mail bestätigt'
-  return true
+  syncStatus = rueckkehrTyp === 'recovery' ? 'Passwort zurücksetzen' : 'E-Mail bestätigt'
+  if (rueckkehrTyp === 'recovery') aktuelleAnsicht = 'daten'
+  return rueckkehrTyp === 'recovery' ? 'recovery' : true
 }
 
 // --------------------------------------------------
@@ -729,6 +752,13 @@ function renderDatenansicht() {
             <button class="primary" id="syncJetzt">Jetzt synchronisieren</button>
             <button class="secondary" id="syncAbmelden">Abmelden</button>
           </div>
+          <form id="passwortAendernForm" class="sync-form">
+            <label for="neuesPasswort"><strong>${authRueckkehr === 'recovery' ? 'Neues Passwort festlegen' : 'Passwort ändern'}</strong></label>
+            <input id="neuesPasswort" type="password" autocomplete="new-password" placeholder="Neues Passwort (mind. 8 Zeichen)" minlength="8" required>
+            <input id="neuesPasswortWiederholen" type="password" autocomplete="new-password" placeholder="Neues Passwort wiederholen" minlength="8" required>
+            <button class="secondary" type="submit">${authRueckkehr === 'recovery' ? 'Neues Passwort speichern' : 'Passwort ändern'}</button>
+            <p id="passwortMeldung" class="hinweis"></p>
+          </form>
         ` : `
           <p>Mit demselben Konto auf Handy und Laptop anmelden. Beim ersten Gerät werden vorhandene lokale Daten übernommen. Weitere Geräte laden anschließend diesen gemeinsamen Stand.</p>
           <form id="syncForm" class="sync-form">
@@ -738,6 +768,7 @@ function renderDatenansicht() {
               <button class="primary" type="submit">Anmelden</button>
               <button class="secondary" id="syncRegistrieren" type="button">Konto erstellen</button>
               <button class="secondary" id="syncBestaetigung" type="button">Bestätigungsmail erneut senden</button>
+              <button class="secondary" id="syncPasswortVergessen" type="button">Passwort vergessen</button>
             </div>
             <p id="syncMeldung" class="hinweis"></p>
           </form>
@@ -815,6 +846,46 @@ function verbindeDatenEvents() {
     try {
       await syncBestaetigungErneutSenden(email)
       meldung.textContent = 'Bestätigungsmail wurde erneut angefordert. Bitte prüfe auch den Spam-Ordner.'
+    } catch (fehler) {
+      meldung.textContent = fehler.message
+    }
+  })
+
+  document.querySelector('#syncPasswortVergessen')?.addEventListener('click', async () => {
+    const meldung = document.querySelector('#syncMeldung')
+    const email = document.querySelector('#syncEmail').value.trim()
+    if (!email) {
+      meldung.textContent = 'Bitte zuerst deine E-Mail-Adresse eingeben.'
+      return
+    }
+    meldung.textContent = 'Passwort-Mail wird angefordert …'
+    try {
+      await syncPasswortResetAnfordern(email)
+      meldung.textContent = 'Passwort-Mail wurde angefordert. Bitte prüfe auch den Spam-Ordner.'
+    } catch (fehler) {
+      meldung.textContent = fehler.message
+    }
+  })
+
+  document.querySelector('#passwortAendernForm')?.addEventListener('submit', async event => {
+    event.preventDefault()
+    const meldung = document.querySelector('#passwortMeldung')
+    const passwort = document.querySelector('#neuesPasswort').value
+    const wiederholung = document.querySelector('#neuesPasswortWiederholen').value
+    if (passwort.length < 8) {
+      meldung.textContent = 'Das neue Passwort muss mindestens 8 Zeichen haben.'
+      return
+    }
+    if (passwort !== wiederholung) {
+      meldung.textContent = 'Die beiden Passwörter stimmen nicht überein.'
+      return
+    }
+    meldung.textContent = 'Passwort wird geändert …'
+    try {
+      await syncPasswortAendern(passwort)
+      document.querySelector('#neuesPasswort').value = ''
+      document.querySelector('#neuesPasswortWiederholen').value = ''
+      meldung.textContent = 'Passwort wurde geändert ✓'
     } catch (fehler) {
       meldung.textContent = fehler.message
     }
