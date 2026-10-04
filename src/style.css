@@ -922,3 +922,67 @@ small {
 
 /* Admin: Einladungsverwaltung */
 .einladungs-liste{display:grid;gap:.65rem;margin-top:1rem}.einladung-zeile{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 0;border-top:1px solid #eceef1}.einladung-zeile small{opacity:.75}.einladungs-hinweis{margin-top:1rem}@media(max-width:620px){.einladung-zeile{align-items:stretch;flex-direction:column}.einladung-zeile button{width:100%}}
+
+
+/* --------------------------------------------------
+   GERICHTSUCHE IM WOCHENPLAN
+   -------------------------------------------------- */
+
+.gericht-suche {
+  position: relative;
+}
+
+.gericht-vorschlaege {
+  position: absolute;
+  z-index: 30;
+  top: calc(100% + 5px);
+  left: 0;
+  right: 0;
+  max-height: 280px;
+  overflow-y: auto;
+  background: white;
+  border: 1px solid #d7dbe0;
+  border-radius: 10px;
+  box-shadow: 0 8px 24px rgba(0, 0, 0, .14);
+}
+
+.gericht-vorschlaege[hidden] {
+  display: none;
+}
+
+.gericht-vorschlag {
+  display: flex;
+  width: 100%;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  border: 0;
+  border-bottom: 1px solid #eceef1;
+  border-radius: 0;
+  padding: 10px 12px;
+  background: white;
+  color: #202124;
+  text-align: left;
+}
+
+.gericht-vorschlag:last-child {
+  border-bottom: 0;
+}
+
+.gericht-vorschlag:hover,
+.gericht-vorschlag:focus {
+  background: #f5f6f8;
+}
+
+.gericht-vorschlag.gericht-anlegen {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  justify-content: flex-start;
+  font-weight: 700;
+  background: #eef0f3;
+}
+
+.gericht-vorschlag small {
+  flex: 0 0 auto;
+}
