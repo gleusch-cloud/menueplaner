@@ -2582,73 +2582,25 @@ function renderWochenansicht() {
 
 
 
-              <select
-
-                class="gericht-auswahl"
-
-                id="gericht-${eintrag.tag}"
-
-                data-tag="${eintrag.tag}"
-
-              >
-
-
-
-                <option value="">
-
-                  Gericht auswählen …
-
-                </option>
-
-
-
-                ${gerichte.map(item => `
-
-                  <option
-
-                    value="${item.id}"
-
-                    ${
-
-                      item.id ===
-
-                      eintrag.gerichtId
-
-                        ? 'selected'
-
-                        : ''
-
-                    }
-
-                  >
-
-                    ${
-
-                      item.favorit
-
-                        ? '⭐ '
-
-                        : ''
-
-                    }
-
-                    ${escapeHtml(item.name)}
-
-                    ·
-
-                    ${escapeHtml(
-
-                      item.kategorie
-
-                    )}
-
-                  </option>
-
-                `).join('')}
-
-
-
-              </select>
+              <div class="gericht-suche">
+                <input
+                  class="gericht-suche-eingabe"
+                  id="gericht-${eintrag.tag}"
+                  data-tag="${eintrag.tag}"
+                  type="text"
+                  value="${gericht ? escapeHtml(gericht.name) : ''}"
+                  placeholder="Gericht eingeben …"
+                  autocomplete="off"
+                  aria-autocomplete="list"
+                  aria-expanded="false"
+                >
+                <div
+                  class="gericht-vorschlaege"
+                  data-tag="${eintrag.tag}"
+                  role="listbox"
+                  hidden
+                ></div>
+              </div>
 
 
 
@@ -3872,53 +3824,93 @@ function verbindeWochenEvents() {
 
 
   document
-
-    .querySelectorAll(
-
-      '.gericht-auswahl'
-
-    )
-
-    .forEach(select => {
-
-
-
-      select.addEventListener(
-
-        'change',
-
-        () => {
-
-
-
-          const eintrag =
-
-            wochenplan.find(
-
-              item =>
-
-                item.tag ===
-
-                select.dataset.tag
-
-            )
-
-
-
-          eintrag.gerichtId =
-
-            select.value || null
-
-
-
-          speichern()
-
-          render()
-
-        }
-
+    .querySelectorAll('.gericht-suche-eingabe')
+    .forEach(feld => {
+      const tag = feld.dataset.tag
+      const liste = document.querySelector(
+        `.gericht-vorschlaege[data-tag="${tag}"]`
       )
 
+      const vorschlaegeAnzeigen = () => {
+        if (!liste) return
+
+        const suchtext = feld.value.trim().toLocaleLowerCase('de-DE')
+        const treffer = gerichte
+          .filter(gericht =>
+            !suchtext ||
+            gericht.name.toLocaleLowerCase('de-DE').includes(suchtext)
+          )
+          .sort((a, b) =>
+            a.name.localeCompare(b.name, 'de-DE', { sensitivity: 'base' })
+          )
+
+        liste.innerHTML = `
+          <button
+            type="button"
+            class="gericht-vorschlag gericht-anlegen"
+            data-aktion="anlegen"
+            role="option"
+          >
+            ＋ Gericht anlegen
+          </button>
+          ${treffer.map(gericht => `
+            <button
+              type="button"
+              class="gericht-vorschlag"
+              data-gericht-id="${gericht.id}"
+              role="option"
+            >
+              <strong>${gericht.favorit ? '⭐ ' : ''}${escapeHtml(gericht.name)}</strong>
+              <small>${escapeHtml(gericht.kategorie)}</small>
+            </button>
+          `).join('')}
+        `
+
+        liste.hidden = false
+        feld.setAttribute('aria-expanded', 'true')
+
+        liste.querySelector('[data-aktion="anlegen"]')
+          ?.addEventListener('click', () => {
+            aktuelleAnsicht = 'gerichte'
+            render()
+          })
+
+        liste.querySelectorAll('[data-gericht-id]')
+          .forEach(button => {
+            button.addEventListener('click', () => {
+              const eintrag = wochenplan.find(item => item.tag === tag)
+              if (!eintrag) return
+
+              eintrag.gerichtId = button.dataset.gerichtId
+              speichern()
+              render()
+            })
+          })
+      }
+
+      feld.addEventListener('focus', vorschlaegeAnzeigen)
+      feld.addEventListener('input', vorschlaegeAnzeigen)
+
+      feld.addEventListener('keydown', event => {
+        if (event.key === 'Escape' && liste) {
+          liste.hidden = true
+          feld.setAttribute('aria-expanded', 'false')
+          feld.blur()
+        }
+      })
+
+      feld.addEventListener('blur', () => {
+        window.setTimeout(() => {
+          if (!liste) return
+          liste.hidden = true
+          feld.setAttribute('aria-expanded', 'false')
+
+          const aktuellesGericht = findeGericht(
+            wochenplan.find(item => item.tag === tag)?.gerichtId
+          )
+          feld.value = aktuellesGericht?.name || ''
+        }, 150)
+      })
     })
 
 
