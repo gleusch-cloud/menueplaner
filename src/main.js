@@ -67,6 +67,7 @@ const STORAGE = {
 const SUPABASE_URL = 'https://txzwiiphpoqtqfdirgqb.supabase.co'
 const SUPABASE_KEY = 'sb_publishable_-lzgsKve3h0aaRQ5Mm9FYw_jaoo7KFL'
 const SYNC_SESSION_KEY = 'menueplaner_sync_session'
+const AUTH_REDIRECT_URL = 'https://gleusch-cloud.github.io/menueplaner/'
 let syncSession = ladeSyncSession()
 let syncBereit = false
 let syncTimer = null
@@ -377,15 +378,12 @@ async function syncAnmelden(email, passwort) {
 }
 
 async function syncBestaetigungErneutSenden(email) {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/resend`, {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/resend?redirect_to=${encodeURIComponent(AUTH_REDIRECT_URL)}`, {
     method: 'POST',
     headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       type: 'signup',
-      email,
-      options: {
-        email_redirect_to: 'https://gleusch-cloud.github.io/menueplaner/'
-      }
+      email
     })
   })
   const daten = await response.json().catch(() => ({}))
@@ -395,15 +393,12 @@ async function syncBestaetigungErneutSenden(email) {
 }
 
 async function syncRegistrieren(email, passwort) {
-  const response = await fetch(`${SUPABASE_URL}/auth/v1/signup`, {
+  const response = await fetch(`${SUPABASE_URL}/auth/v1/signup?redirect_to=${encodeURIComponent(AUTH_REDIRECT_URL)}`, {
     method: 'POST',
     headers: { apikey: SUPABASE_KEY, 'Content-Type': 'application/json' },
     body: JSON.stringify({
       email,
-      password: passwort,
-      options: {
-        email_redirect_to: 'https://gleusch-cloud.github.io/menueplaner/'
-      }
+      password: passwort
     })
   })
   const daten = await response.json()
@@ -477,6 +472,37 @@ function syncAbmelden() {
   speichereSyncSession(null)
   syncStatus = 'Nur lokal'
   render()
+}
+
+function uebernehmeAuthRueckkehr() {
+  const hash = new URLSearchParams(location.hash.replace(/^#/, ''))
+  const accessToken = hash.get('access_token')
+  const refreshToken = hash.get('refresh_token')
+
+  if (!accessToken || !refreshToken) return false
+
+  const user = (() => {
+    try {
+      const payload = JSON.parse(atob(accessToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/')))
+      return { id: payload.sub, email: payload.email || '' }
+    } catch {
+      return null
+    }
+  })()
+
+  if (!user?.id) return false
+
+  speichereSyncSession({
+    access_token: accessToken,
+    refresh_token: refreshToken,
+    token_type: hash.get('token_type') || 'bearer',
+    expires_in: Number(hash.get('expires_in') || 3600),
+    user
+  })
+
+  history.replaceState(null, '', location.pathname + location.search)
+  syncStatus = 'E-Mail bestätigt'
+  return true
 }
 
 // --------------------------------------------------
@@ -4723,6 +4749,7 @@ document.addEventListener('visibilitychange', () => {
 
 speichern()
 
+const authRueckkehr = uebernehmeAuthRueckkehr()
 render()
 
 if (syncSession?.access_token) {
