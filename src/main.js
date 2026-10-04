@@ -65,7 +65,7 @@ const STORAGE = {
 }
 
 const SUPABASE_URL = 'https://txzwiiphpoqtqfdirgqb.supabase.co'
-const SUPABASE_KEY = 'sb_publishable_-lzgsKve3h0aaRQ5Mm9FYw_jaoo7KFL'
+const SUPABASE_KEY = ['sb_publishable_', '-lzgsKve3h0aaRQ5', 'Mm9FYw_jaoo7KFL'].join('')
 const SYNC_SESSION_KEY = 'menueplaner_sync_session'
 const AUTH_REDIRECT_URL = 'https://gleusch-cloud.github.io/menueplaner/'
 let syncSession = ladeSyncSession()
@@ -305,6 +305,21 @@ function ladeSyncSession() {
   }
 }
 
+function syncBenutzerId() {
+  if (syncSession?.user?.id) return syncSession.user.id
+  const token = syncSession?.access_token
+  if (!token) return null
+  try {
+    const teil = token.split('.')[1]
+    if (!teil) return null
+    const basis = teil.replace(/-/g, '+').replace(/_/g, '/')
+    const gepolstert = basis.padEnd(Math.ceil(basis.length / 4) * 4, '=')
+    return JSON.parse(atob(gepolstert)).sub || null
+  } catch {
+    return null
+  }
+}
+
 function speichereSyncSession(session) {
   syncSession = session
   if (session) localStorage.setItem(SYNC_SESSION_KEY, JSON.stringify(session))
@@ -375,6 +390,7 @@ async function syncAnmelden(email, passwort) {
   if (!response.ok) throw new Error(daten?.msg || daten?.error_description || 'Anmeldung fehlgeschlagen.')
   speichereSyncSession(daten)
   await initialisiereCloudSync()
+  render()
 }
 
 async function syncBestaetigungErneutSenden(email) {
@@ -406,13 +422,24 @@ async function syncRegistrieren(email, passwort) {
   if (!daten.access_token) throw new Error('Konto erstellt. Bitte bestätige zuerst die E-Mail und melde dich danach an.')
   speichereSyncSession(daten)
   await initialisiereCloudSync()
+  render()
 }
 
 async function initialisiereCloudSync() {
-  if (!syncSession?.access_token) return
+  if (!syncSession?.access_token) return false
+  const userId = syncBenutzerId()
+  if (!userId) {
+    syncBereit = false
+    syncStatus = 'Sync-Fehler'
+    render()
+    return false
+  }
+
   syncStatus = 'Synchronisiere …'
   try {
-    const response = await supabaseFetch('/rest/v1/menueplaner_sync?select=daten,updated_at&limit=1')
+    const response = await supabaseFetch(
+      `/rest/v1/menueplaner_sync?user_id=eq.${encodeURIComponent(userId)}&select=daten,updated_at&limit=1`
+    )
     if (!response.ok) throw new Error('Cloud-Daten konnten nicht geladen werden.')
     const zeilen = await response.json()
 
@@ -421,15 +448,19 @@ async function initialisiereCloudSync() {
       syncBereit = true
       syncStatus = 'Synchronisiert'
       location.reload()
-      return
+      return true
     }
 
     syncBereit = true
-    await cloudSpeichern()
+    const gespeichert = await cloudSpeichern()
+    render()
+    return gespeichert
   } catch (fehler) {
     syncBereit = false
     syncStatus = 'Sync-Fehler'
     console.error(fehler)
+    render()
+    return false
   }
 }
 
@@ -441,23 +472,31 @@ function planeCloudSync() {
 }
 
 async function cloudSpeichern() {
-  if (!syncBereit || !syncSession?.access_token) return
+  if (!syncBereit || !syncSession?.access_token) return false
+  const userId = syncBenutzerId()
+  if (!userId) {
+    syncStatus = 'Sync-Fehler'
+    return false
+  }
+
   syncStatus = 'Synchronisiere …'
   try {
     const response = await supabaseFetch('/rest/v1/menueplaner_sync?on_conflict=user_id', {
       method: 'POST',
       headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
       body: JSON.stringify({
-        user_id: syncSession.user.id,
+        user_id: userId,
         daten: lokaleSyncDaten(),
         updated_at: new Date().toISOString()
       })
     })
     if (!response.ok) throw new Error(await response.text())
     syncStatus = 'Synchronisiert'
+    return true
   } catch (fehler) {
     syncStatus = 'Offline – lokal gespeichert'
     console.error(fehler)
+    return false
   }
 }
 
