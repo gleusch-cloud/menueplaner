@@ -919,3 +919,6 @@ small {
     grid-template-columns: 1fr;
   }
 }
+
+/* Admin: Einladungsverwaltung */
+.einladungs-liste{display:grid;gap:.65rem;margin-top:1rem}.einladung-zeile{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 0;border-top:1px solid #eceef1}.einladung-zeile small{opacity:.75}.einladungs-hinweis{margin-top:1rem}@media(max-width:620px){.einladung-zeile{align-items:stretch;flex-direction:column}.einladung-zeile button{width:100%}}

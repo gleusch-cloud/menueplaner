@@ -642,6 +642,71 @@ async function backupWiederherstellen(datei) {
   location.reload()
 }
 
+async function ladeEinladungen() {
+  if (!syncSession?.access_token) return { admin: false, einladungen: [] }
+  const response = await supabaseFetch('/functions/v1/einladungen-admin')
+  if (response.status === 403) return { admin: false, einladungen: [] }
+  const daten = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(daten.error || 'Einladungen konnten nicht geladen werden.')
+  return { admin: true, einladungen: daten.einladungen || [] }
+}
+
+async function setzeEinladung(email, aktiv) {
+  const response = await supabaseFetch('/functions/v1/einladungen-admin', { method: 'POST', body: JSON.stringify({ email, aktiv }) })
+  const daten = await response.json().catch(() => ({}))
+  if (!response.ok) throw new Error(daten.error || 'Einladung konnte nicht geändert werden.')
+}
+
+function renderEinladungsverwaltung(einladungen) {
+  return `<article class="verwaltung-karte backup-karte sync-karte">
+    <h3>👥 Benutzer freigeben</h3>
+    <p>Nur freigegebene E-Mail-Adressen dürfen ein neues Konto erstellen. Das Passwort legt jeder Benutzer selbst fest.</p>
+    <form id="einladungForm" class="sync-form">
+      <input id="einladungEmail" type="email" autocomplete="email" placeholder="E-Mail-Adresse freigeben" required>
+      <button class="primary" type="submit">+ Freigeben</button>
+      <p id="einladungMeldung" class="hinweis"></p>
+    </form>
+    <div class="einladungs-liste">
+      ${einladungen.length ? einladungen.map(e => `<div class="einladung-zeile">
+        <span><strong>${escapeHtml(e.email)}</strong><br><small>${e.aktiv ? 'Freigegeben' : 'Registrierung gesperrt'}</small></span>
+        <button class="${e.aktiv ? 'secondary' : 'primary'} einladung-toggle" data-email="${escapeHtml(e.email)}" data-aktiv="${e.aktiv ? 'false' : 'true'}">${e.aktiv ? 'Registrierung sperren' : 'Freigeben'}</button>
+      </div>`).join('') : '<p class="hinweis">Noch keine Freigaben vorhanden.</p>'}
+    </div>
+    <p class="hinweis einladungs-hinweis">Die Sperre verhindert eine neue Registrierung. Ein bereits bestehendes Konto wird dadurch nicht deaktiviert.</p>
+  </article>`
+}
+
+async function ladeEinladungsverwaltungInAnsicht() {
+  const platz = document.querySelector('#einladungsVerwaltung')
+  if (!platz || !syncSession?.access_token) return
+  try {
+    const { admin, einladungen } = await ladeEinladungen()
+    if (!admin) { platz.remove(); return }
+    platz.innerHTML = renderEinladungsverwaltung(einladungen)
+    verbindeEinladungsEvents()
+  } catch (fehler) {
+    platz.innerHTML = `<article class="verwaltung-karte backup-karte"><h3>👥 Benutzer freigeben</h3><p class="hinweis">${escapeHtml(fehler.message)}</p></article>`
+  }
+}
+
+function verbindeEinladungsEvents() {
+  document.querySelector('#einladungForm')?.addEventListener('submit', async event => {
+    event.preventDefault()
+    const email = document.querySelector('#einladungEmail').value.trim()
+    const meldung = document.querySelector('#einladungMeldung')
+    meldung.textContent = 'Wird freigegeben …'
+    try { await setzeEinladung(email, true); await ladeEinladungsverwaltungInAnsicht() }
+    catch (fehler) { meldung.textContent = fehler.message }
+  })
+  document.querySelectorAll('.einladung-toggle').forEach(button => {
+    button.addEventListener('click', async () => {
+      button.disabled = true
+      try { await setzeEinladung(button.dataset.email, button.dataset.aktiv === 'true'); await ladeEinladungsverwaltungInAnsicht() }
+      catch (fehler) { alert(fehler.message); button.disabled = false }
+    })
+  })
+}
+
 function renderDatenansicht() {
   const angemeldet = Boolean(syncSession?.access_token)
   const email = syncSession?.user?.email || ''
@@ -679,6 +744,8 @@ function renderDatenansicht() {
         `}
       </article>
 
+      ${angemeldet ? '<div id="einladungsVerwaltung"></div>' : ''}
+
       <article class="verwaltung-karte backup-karte">
         <h3>💾 Backup erstellen</h3>
         <p>Speichert Gerichte, Snacks, Wochenpläne, Einkaufslisten und Einkaufshistorie in einer Datei.</p>
@@ -701,6 +768,7 @@ function renderDatenansicht() {
 }
 
 function verbindeDatenEvents() {
+  ladeEinladungsverwaltungInAnsicht()
   document.querySelector('#backupErstellen')?.addEventListener('click', backupHerunterladen)
   document.querySelector('#backupDatei')?.addEventListener('change', event => {
     backupWiederherstellen(event.target.files?.[0])
