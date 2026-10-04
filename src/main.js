@@ -454,7 +454,13 @@ async function cloudRpc(name, body = {}) {
   })
   const text = await response.text()
   let daten = null
-  try { daten = text ? JSON.parse(text) : null } catch { daten = text }
+  if (text) {
+    try {
+      daten = JSON.parse(text)
+    } catch {
+      daten = text
+    }
+  }
 
   if (!response.ok) {
     const meldung = daten?.message || daten?.hint || daten?.details || text || `HTTP ${response.status}`
