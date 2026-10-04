@@ -431,35 +431,43 @@ async function initialisiereCloudSync() {
   if (!userId) {
     syncBereit = false
     syncStatus = 'Sync-Fehler'
-    render()
+    aktualisiereSyncAnzeige()
     return false
   }
 
   syncStatus = 'Synchronisiere …'
+  aktualisiereSyncAnzeige(true)
+
   try {
     const response = await supabaseFetch(
       `/rest/v1/menueplaner_sync?user_id=eq.${encodeURIComponent(userId)}&select=daten,updated_at&limit=1`
     )
-    if (!response.ok) throw new Error('Cloud-Daten konnten nicht geladen werden.')
+    if (!response.ok) throw new Error(await response.text() || 'Cloud-Daten konnten nicht geladen werden.')
     const zeilen = await response.json()
 
     if (zeilen.length) {
-      uebernehmeSyncDaten(zeilen[0].daten)
+      const lokal = lokaleSyncDaten()
+      const remote = zeilen[0].daten || {}
       syncBereit = true
-      syncStatus = 'Synchronisiert'
-      location.reload()
+      syncStatus = 'Synchronisiert ✓'
+
+      if (JSON.stringify(lokal) !== JSON.stringify(remote)) {
+        uebernehmeSyncDaten(remote)
+        location.reload()
+        return true
+      }
+
+      aktualisiereSyncAnzeige()
       return true
     }
 
     syncBereit = true
-    const gespeichert = await cloudSpeichern()
-    render()
-    return gespeichert
+    return await cloudSpeichern(true)
   } catch (fehler) {
     syncBereit = false
     syncStatus = 'Sync-Fehler'
     console.error(fehler)
-    render()
+    aktualisiereSyncAnzeige()
     return false
   }
 }
@@ -471,15 +479,18 @@ function planeCloudSync() {
   syncTimer = setTimeout(cloudSpeichern, 700)
 }
 
-async function cloudSpeichern() {
+async function cloudSpeichern(anzeigeAktualisieren = false) {
   if (!syncBereit || !syncSession?.access_token) return false
   const userId = syncBenutzerId()
   if (!userId) {
     syncStatus = 'Sync-Fehler'
+    if (anzeigeAktualisieren) aktualisiereSyncAnzeige()
     return false
   }
 
   syncStatus = 'Synchronisiere …'
+  if (anzeigeAktualisieren) aktualisiereSyncAnzeige(true)
+
   try {
     const response = await supabaseFetch('/rest/v1/menueplaner_sync?on_conflict=user_id', {
       method: 'POST',
@@ -491,19 +502,31 @@ async function cloudSpeichern() {
       })
     })
     if (!response.ok) throw new Error(await response.text())
-    syncStatus = 'Synchronisiert'
+    syncStatus = `Synchronisiert ✓ · ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
+    if (anzeigeAktualisieren) aktualisiereSyncAnzeige()
     return true
   } catch (fehler) {
     syncStatus = 'Offline – lokal gespeichert'
     console.error(fehler)
+    if (anzeigeAktualisieren) aktualisiereSyncAnzeige()
     return false
   }
 }
 
+function aktualisiereSyncAnzeige(laufend = false) {
+  const status = document.querySelector('.sync-status')
+  const button = document.querySelector('#syncJetzt')
+  if (status) status.textContent = `Status: ${syncStatus}`
+  if (button) {
+    button.disabled = laufend
+    button.textContent = laufend ? 'Synchronisiere …' : 'Jetzt synchronisieren'
+  }
+}
+
 async function cloudNeuLaden() {
-  if (!syncSession?.access_token) return
+  if (!syncSession?.access_token) return false
   syncBereit = false
-  await initialisiereCloudSync()
+  return await initialisiereCloudSync()
 }
 
 function syncAbmelden() {
