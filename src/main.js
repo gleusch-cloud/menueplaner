@@ -489,7 +489,13 @@ async function initialisiereCloudSync() {
 
       if (JSON.stringify(lokal) !== JSON.stringify(remote)) {
         uebernehmeSyncDaten(remote)
-        location.reload()
+        // Zustand im laufenden Tab ebenfalls aktualisieren, ohne Reload-Schleife.
+        gerichte = ladeDaten(STORAGE.gerichte, gerichte)
+        snacks = ladeDaten(STORAGE.snacks, snacks)
+        wochenplaene = ladeDaten(STORAGE.wochenplaene, wochenplaene)
+        einkaufslisten = ladeDaten(STORAGE.einkaufslisten, einkaufslisten)
+        wochenStart = ladeWochenStart()
+        render()
         return true
       }
 
