@@ -482,8 +482,17 @@ async function initialisiereCloudSync() {
       return true
     }
 
+    // Noch kein Cloud-Stand vorhanden: den aktuellen lokalen Stand als
+    // ersten Cloud-Datensatz anlegen. Direkt hier speichern, statt über
+    // planeCloudSync(), damit der Erstabgleich garantiert stattfindet.
     syncBereit = true
-    return await cloudSpeichern(true)
+    const gespeichert = await cloudSpeichern(true)
+    if (!gespeichert) {
+      syncBereit = false
+      syncStatus = 'Sync-Fehler – Cloud noch leer'
+      aktualisiereSyncAnzeige()
+    }
+    return gespeichert
   } catch (fehler) {
     syncBereit = false
     syncStatus = 'Sync-Fehler'
@@ -501,7 +510,7 @@ function planeCloudSync() {
 }
 
 async function cloudSpeichern(anzeigeAktualisieren = false) {
-  if (!syncBereit || !syncSession?.access_token) return false
+  if (!syncSession?.access_token) return false
   const userId = syncBenutzerId()
   if (!userId) {
     syncStatus = 'Sync-Fehler'
@@ -523,6 +532,17 @@ async function cloudSpeichern(anzeigeAktualisieren = false) {
       })
     })
     if (!response.ok) throw new Error(await response.text())
+
+    // Nicht nur einem 2xx vertrauen: anschließend prüfen, ob der Datensatz
+    // für genau diesen Benutzer wirklich in der Cloud vorhanden ist.
+    const pruefung = await supabaseFetch(
+      `/rest/v1/menueplaner_sync?user_id=eq.${encodeURIComponent(userId)}&select=updated_at&limit=1`
+    )
+    if (!pruefung.ok) throw new Error(await pruefung.text() || 'Cloud-Speicherung konnte nicht geprüft werden.')
+    const gespeichert = await pruefung.json()
+    if (!gespeichert.length) throw new Error('Cloud-Datensatz wurde nicht angelegt.')
+
+    syncBereit = true
     syncStatus = `Synchronisiert ✓ · ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
     if (anzeigeAktualisieren) aktualisiereSyncAnzeige()
     return true
