@@ -536,7 +536,10 @@ async function cloudSpeichern(anzeigeAktualisieren = false) {
   try {
     const response = await supabaseFetch('/rest/v1/menueplaner_sync?on_conflict=user_id', {
       method: 'POST',
-      headers: { Prefer: 'resolution=merge-duplicates,return=minimal' },
+      headers: {
+        Prefer: 'resolution=merge-duplicates,return=minimal',
+        'Content-Type': 'application/json'
+      },
       body: JSON.stringify({
         user_id: userId,
         daten: lokaleSyncDaten(),
