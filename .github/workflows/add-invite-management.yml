@@ -17,8 +17,9 @@ jobs:
           ref: main
           fetch-depth: 0
       - name: Patch app
-        shell: python
+        shell: bash
         run: |
+          python - <<'PY'
           from pathlib import Path
           p=Path("src/main.js"); s=p.read_text(encoding="utf-8")
           marker="function renderDatenansicht() {"
@@ -63,6 +64,7 @@ function verbindeEinladungsEvents() {
           css=Path("src/style.css"); cs=css.read_text(encoding="utf-8")
           if ".einladung-zeile" not in cs: cs += "\n.einladungs-liste{display:grid;gap:.65rem;margin-top:1rem}.einladung-zeile{display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 0;border-top:1px solid var(--border,#ddd)}.einladung-zeile small{opacity:.7}\n"
           css.write_text(cs,encoding="utf-8")
+          PY
       - uses: actions/setup-node@v6
         with:
           node-version: 24
