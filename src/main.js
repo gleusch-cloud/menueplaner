@@ -331,7 +331,11 @@ function lokaleSyncDaten() {
   const daten = {}
   Object.entries(STORAGE).forEach(([name, key]) => {
     const roh = localStorage.getItem(key)
-    daten[name] = roh === null ? null : JSON.parse(roh)
+    if (roh === null) daten[name] = null
+    else {
+      try { daten[name] = JSON.parse(roh) }
+      catch { daten[name] = roh }
+    }
   })
   return daten
 }
