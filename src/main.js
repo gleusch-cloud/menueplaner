@@ -447,27 +447,31 @@ async function syncRegistrieren(email, passwort) {
   render()
 }
 
+async function cloudRpc(name, body = {}) {
+  const response = await supabaseFetch(`/rest/v1/rpc/${name}`, {
+    method: 'POST',
+    body: JSON.stringify(body)
+  })
+  const text = await response.text()
+  let daten = null
+  try { daten = text ? JSON.parse(text) : null } catch { daten = text }
+
+  if (!response.ok) {
+    const meldung = daten?.message || daten?.hint || daten?.details || text || `HTTP ${response.status}`
+    throw new Error(meldung)
+  }
+  return daten
+}
+
 async function initialisiereCloudSync() {
   if (!syncSession?.access_token) return false
-  const userId = syncBenutzerId()
-  if (!userId) {
-    syncBereit = false
-    syncStatus = 'Sync-Fehler'
-    aktualisiereSyncAnzeige()
-    return false
-  }
 
   syncStatus = 'Synchronisiere …'
   aktualisiereSyncAnzeige(true)
 
   try {
-    const response = await supabaseFetch(
-      `/rest/v1/menueplaner_sync?user_id=eq.${encodeURIComponent(userId)}&select=daten,updated_at&limit=1`
-    )
-    if (!response.ok) throw new Error(await response.text() || 'Cloud-Daten konnten nicht geladen werden.')
-    const zeilen = await response.json()
-
-    if (zeilen.length) {
+    const zeilen = await cloudRpc('menueplaner_sync_laden')
+    if (Array.isArray(zeilen) && zeilen.length) {
       const lokal = lokaleSyncDaten()
       const remote = zeilen[0].daten || {}
       syncBereit = true
@@ -483,20 +487,13 @@ async function initialisiereCloudSync() {
       return true
     }
 
-    // Noch kein Cloud-Stand vorhanden: den aktuellen lokalen Stand als
-    // ersten Cloud-Datensatz anlegen. Direkt hier speichern, statt über
-    // planeCloudSync(), damit der Erstabgleich garantiert stattfindet.
+    // Die Cloud ist leer. Der lokale Browser ist damit die Quelle für
+    // den allerersten Cloud-Stand.
     syncBereit = true
-    const gespeichert = await cloudSpeichern(true)
-    if (!gespeichert) {
-      syncBereit = false
-      syncStatus = 'Sync-Fehler – Cloud noch leer'
-      aktualisiereSyncAnzeige()
-    }
-    return gespeichert
+    return await cloudSpeichern(true)
   } catch (fehler) {
     syncBereit = false
-    syncStatus = 'Sync-Fehler'
+    syncStatus = `Sync-Fehler: ${fehler.message || 'unbekannter Fehler'}`
     console.error(fehler)
     aktualisiereSyncAnzeige()
     return false
@@ -523,46 +520,26 @@ function planeCloudSync() {
 
 async function cloudSpeichern(anzeigeAktualisieren = false) {
   if (!syncSession?.access_token) return false
-  const userId = syncBenutzerId()
-  if (!userId) {
-    syncStatus = 'Sync-Fehler'
-    if (anzeigeAktualisieren) aktualisiereSyncAnzeige()
-    return false
-  }
 
   syncStatus = 'Synchronisiere …'
   if (anzeigeAktualisieren) aktualisiereSyncAnzeige(true)
 
   try {
-    const response = await supabaseFetch('/rest/v1/menueplaner_sync?on_conflict=user_id', {
-      method: 'POST',
-      headers: {
-        Prefer: 'resolution=merge-duplicates,return=minimal',
-        'Content-Type': 'application/json'
-      },
-      body: JSON.stringify({
-        user_id: userId,
-        daten: lokaleSyncDaten(),
-        updated_at: new Date().toISOString()
-      })
-    })
-    if (!response.ok) throw new Error(await response.text())
+    await cloudRpc('menueplaner_sync_speichern', { p_daten: lokaleSyncDaten() })
 
-    // Nicht nur einem 2xx vertrauen: anschließend prüfen, ob der Datensatz
-    // für genau diesen Benutzer wirklich in der Cloud vorhanden ist.
-    const pruefung = await supabaseFetch(
-      `/rest/v1/menueplaner_sync?user_id=eq.${encodeURIComponent(userId)}&select=updated_at&limit=1`
-    )
-    if (!pruefung.ok) throw new Error(await pruefung.text() || 'Cloud-Speicherung konnte nicht geprüft werden.')
-    const gespeichert = await pruefung.json()
-    if (!gespeichert.length) throw new Error('Cloud-Datensatz wurde nicht angelegt.')
+    // Server-seitig zurücklesen. Erst dann gilt der Vorgang als erfolgreich.
+    const pruefung = await cloudRpc('menueplaner_sync_laden')
+    if (!Array.isArray(pruefung) || !pruefung.length) {
+      throw new Error('Cloud-Datensatz wurde nach dem Speichern nicht gefunden.')
+    }
 
     syncBereit = true
     syncStatus = `Synchronisiert ✓ · ${new Date().toLocaleTimeString('de-DE', { hour: '2-digit', minute: '2-digit' })}`
     if (anzeigeAktualisieren) aktualisiereSyncAnzeige()
     return true
   } catch (fehler) {
-    syncStatus = 'Offline – lokal gespeichert'
+    syncBereit = false
+    syncStatus = `Sync-Fehler: ${fehler.message || 'unbekannter Fehler'}`
     console.error(fehler)
     if (anzeigeAktualisieren) aktualisiereSyncAnzeige()
     return false
