@@ -1,9 +1,5 @@
 name: Add Invite Management
-'on':
-  push:
-    paths:
-      - '.github/workflows/add-invite-management.yml'
-  workflow_dispatch:
+'on': [push]
 permissions:
   contents: write
   pages: write
