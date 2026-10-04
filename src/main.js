@@ -3838,7 +3838,7 @@ function verbindeWochenEvents() {
         const treffer = gerichte
           .filter(gericht =>
             !suchtext ||
-            gericht.name.toLocaleLowerCase('de-DE').includes(suchtext)
+            gericht.name.toLocaleLowerCase('de-DE').startsWith(suchtext)
           )
           .sort((a, b) =>
             a.name.localeCompare(b.name, 'de-DE', { sensitivity: 'base' })
