@@ -986,3 +986,17 @@ small {
 .gericht-vorschlag small {
   flex: 0 0 auto;
 }
+
+
+/* Tagesuebersicht oberhalb des unveraenderten Wochenplans */
+.heute-karte{border:1px solid #d7e8dc;border-radius:14px;background:#f5fbf6;padding:16px;margin-bottom:20px}
+.heute-kopf{display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap}
+.heute-kopf h2{margin:0;font-size:1.2rem}
+.heute-kopf p{margin:5px 0 0;color:#53665a}
+.heute-inhalt{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin-top:16px}
+.heute-inhalt>div{min-width:0;background:#fff;border:1px solid #e1ebe3;border-radius:10px;padding:12px}
+.heute-inhalt strong{font-size:.9rem}
+.heute-inhalt p{margin:8px 0 0;overflow-wrap:anywhere}
+.tageskarte.heute-ziel{outline:3px solid #6ebc80;outline-offset:2px}
+@media(max-width:620px){.heute-inhalt{grid-template-columns:1fr;gap:8px}.heute-kopf button{width:100%}}
+@media print{.heute-karte{display:none!important}}
