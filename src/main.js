@@ -992,13 +992,26 @@ function neuesGericht(
 
     zuletztGegessen: null,
 
-    zutaten: []
+    zutaten: [],
+    rezeptLink: ''
 
   }
 
 }
 
+function sichererRezeptLink(wert) {
+  const text = String(wert || '').trim()
+  if (!text) return ''
+  try {
+    const url = new URL(text)
+    return ['https:', 'http:'].includes(url.protocol) ? url.href : ''
+  } catch { return '' }
+}
 
+function rezeptLinkHtml(gericht) {
+  const link = sichererRezeptLink(gericht?.rezeptLink)
+  return link ? `<a class="rezept-link" href="${escapeHtml(link)}" target="_blank" rel="noopener noreferrer">🔗 Rezept öffnen</a>` : ''
+}
 
 function normalisiereGericht(gericht) {
 
@@ -1018,7 +1031,8 @@ function normalisiereGericht(gericht) {
 
     zutaten: Array.isArray(gericht.zutaten)
       ? gericht.zutaten.filter(Boolean)
-      : []
+      : [],
+    rezeptLink: sichererRezeptLink(gericht.rezeptLink)
 
   }
 
@@ -2442,7 +2456,7 @@ function renderHeuteUebersicht() {
         <button type="button" class="primary" id="heuteBearbeiten">✏️ Heute bearbeiten</button>
       </div>
       <div class="heute-inhalt">
-        <div><strong>🍽️ Gericht</strong><p>${gericht ? escapeHtml(gericht.name) : 'Noch kein Gericht geplant'}</p></div>
+        <div><strong>🍽️ Gericht</strong><p>${gericht ? escapeHtml(gericht.name) : 'Noch kein Gericht geplant'}</p>${rezeptLinkHtml(gericht)}</div>
         <div><strong>🍎 Snacks</strong><p>${snackNamen.length ? snackNamen.map(escapeHtml).join(', ') : 'Keine Snacks geplant'}</p></div>
         <div><strong>📝 Notiz</strong><p>${eintrag?.notiz ? escapeHtml(eintrag.notiz) : 'Keine Notiz'}</p></div>
       </div>
@@ -2691,8 +2705,7 @@ function renderWochenansicht() {
 
 
                     </div>
-
-
+                    ${rezeptLinkHtml(gericht)}
 
                     <button
 
@@ -3164,6 +3177,7 @@ function renderVerwaltung(bereich) {
             placeholder="Zutaten, z. B. 500 g Hackfleisch, Nudeln, Tomaten"
             rows="2"
           ></textarea>
+          <input id="gerichtRezeptLink" type="url" placeholder="🔗 Rezeptlink (optional, https://...)" aria-label="Rezeptlink (optional)">
 
 
 
@@ -3275,6 +3289,7 @@ function renderVerwaltung(bereich) {
                           rows="3"
                           placeholder="Zutaten, durch Komma oder neue Zeile getrennt"
                         >${escapeHtml(gericht.zutaten.join(', '))}</textarea>
+                        <input class="gericht-bearbeiten-rezept" data-id="${gericht.id}" type="url" placeholder="🔗 Rezeptlink (optional)" value="${escapeHtml(gericht.rezeptLink || '')}">
 
 
 
@@ -3392,6 +3407,7 @@ function renderVerwaltung(bereich) {
 
                         </small>
 
+                        ${rezeptLinkHtml(gericht)}
                         ${
                           gericht.zutaten.length
                             ? `<small>🛒 ${escapeHtml(gericht.zutaten.join(' · '))}</small>`
@@ -4379,6 +4395,12 @@ function verbindeVerwaltungsEvents() {
         )
 
         gericht.zutaten = zutaten
+        const rezeptEingabe = document.querySelector('#gerichtRezeptLink')?.value.trim() || ''
+        if (rezeptEingabe && !sichererRezeptLink(rezeptEingabe)) {
+          alert('Bitte einen gültigen Rezeptlink mit http:// oder https:// eingeben.')
+          return
+        }
+        gericht.rezeptLink = sichererRezeptLink(rezeptEingabe)
 
         gerichte.push(gericht)
 
@@ -4655,9 +4677,15 @@ function verbindeVerwaltungsEvents() {
 
           kategorieFeld.value
 
+        const rezeptEingabe = document.querySelector(`.gericht-bearbeiten-rezept[data-id="${id}"]`)?.value.trim() || ''
+        if (rezeptEingabe && !sichererRezeptLink(rezeptEingabe)) {
+          alert('Bitte einen gültigen Rezeptlink mit http:// oder https:// eingeben.')
+          return
+        }
         gericht.zutaten = parseZutaten(
           zutatenFeld?.value
         )
+        gericht.rezeptLink = sichererRezeptLink(rezeptEingabe)
 
 
 
