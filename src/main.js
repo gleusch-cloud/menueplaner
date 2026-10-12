@@ -2417,9 +2417,43 @@ function render() {
 
 
 
+function renderHeuteUebersicht() {
+  const heute = datumOhneUhrzeit(new Date())
+  const start = findeFreitagDerPlanungswoche()
+  const index = Math.round((heute - start) / 86400000)
+  const plan = datumZuSpeicherwert(start) === datumZuSpeicherwert(wochenStart)
+    ? wochenplan
+    : ladeWochenplan(start)
+  const eintrag = plan[index]
+  const gericht = eintrag ? findeGericht(eintrag.gerichtId) : null
+  const snackNamen = (eintrag?.snackIds || [])
+    .map(id => findeSnack(id)?.name)
+    .filter(Boolean)
+  const datumText = heute.toLocaleDateString('de-DE', {
+    weekday: 'long', day: 'numeric', month: 'long'
+  })
+  return `
+    <section class="heute-karte" aria-label="Heutiger Speiseplan">
+      <div class="heute-kopf">
+        <div>
+          <h2>🍽️ Heute auf dem Speiseplan</h2>
+          <p>${escapeHtml(datumText)}</p>
+        </div>
+        <button type="button" class="primary" id="heuteBearbeiten">✏️ Heute bearbeiten</button>
+      </div>
+      <div class="heute-inhalt">
+        <div><strong>🍽️ Gericht</strong><p>${gericht ? escapeHtml(gericht.name) : 'Noch kein Gericht geplant'}</p></div>
+        <div><strong>🍎 Snacks</strong><p>${snackNamen.length ? snackNamen.map(escapeHtml).join(', ') : 'Keine Snacks geplant'}</p></div>
+        <div><strong>📝 Notiz</strong><p>${eintrag?.notiz ? escapeHtml(eintrag.notiz) : 'Keine Notiz'}</p></div>
+      </div>
+    </section>
+  `
+}
+
 function renderWochenansicht() {
 
   return `
+    ${renderHeuteUebersicht()}
 
     <section class="seitenkopf">
 
@@ -3745,6 +3779,22 @@ function verbindeNavigation() {
 
 
 function verbindeWochenEvents() {
+
+  document.querySelector('#heuteBearbeiten')?.addEventListener('click', () => {
+    if (!istAktuelleWoche()) {
+      speichern()
+      wochenStart = findeFreitagDerPlanungswoche()
+      wochenplan = ladeWochenplan(wochenStart)
+      speichern()
+      render()
+    }
+    const heute = datumOhneUhrzeit(new Date())
+    const index = Math.round((heute - findeFreitagDerPlanungswoche()) / 86400000)
+    const karte = document.querySelectorAll('.tage-liste .tageskarte')[index]
+    karte?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    karte?.classList.add('heute-ziel')
+    window.setTimeout(() => karte?.classList.remove('heute-ziel'), 1800)
+  })
 
   document.querySelector('#wochenDrucken')?.addEventListener('click', () => window.print())
 
