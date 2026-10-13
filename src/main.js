@@ -191,6 +191,9 @@ let aktuelleAnsicht = 'woche'
 
 let bearbeitetesGerichtId = null
 
+// Entwurf aus der Wochenansicht bis zum Speichern merken.
+let gerichtAnlegenEntwurf = null
+
 let bearbeiteterSnackId = null
 
 let offeneEinkaufslisteId = 'essen'
@@ -3141,6 +3144,7 @@ function renderVerwaltung(bereich) {
             id="gerichtName"
 
             type="text"
+            value="${escapeHtml(gerichtAnlegenEntwurf?.name || '')}"
 
             placeholder="Gericht eingeben"
 
@@ -3937,8 +3941,10 @@ function verbindeWochenEvents() {
 
         liste.querySelector('[data-aktion="anlegen"]')
           ?.addEventListener('click', () => {
+            gerichtAnlegenEntwurf = { name: feld.value.trim(), tag, wochenStart: datumZuSpeicherwert(wochenStart) }
             aktuelleAnsicht = 'gerichte'
             render()
+            document.querySelector('#gerichtName')?.focus()
           })
 
         liste.querySelectorAll('[data-gericht-id]')
@@ -4404,11 +4410,19 @@ function verbindeVerwaltungsEvents() {
 
         gerichte.push(gericht)
 
+        const ruecksprung = gerichtAnlegenEntwurf
+        gerichtAnlegenEntwurf = null
+        if (ruecksprung && ruecksprung.wochenStart === datumZuSpeicherwert(wochenStart)) {
+          const eintrag = wochenplan.find(item => item.tag === ruecksprung.tag)
+          if (eintrag) eintrag.gerichtId = gericht.id
+        }
 
-
-        speichern()
-
+        if (ruecksprung) aktuelleAnsicht = 'woche'
         render()
+        if (ruecksprung) {
+          const karte = document.querySelector(`.tageskarte[data-tag="${ruecksprung.tag}"]`)
+          karte?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+        }
 
       }
 
